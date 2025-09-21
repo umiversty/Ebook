@@ -332,16 +332,19 @@
     display: flex;
     gap: 8px;
     align-items: center;
+    flex-wrap: wrap;
   }
 
   .control {
     background: #7c9cff;
     color: #0b1020;
     border: none;
-    padding: 8px 12px;
+    padding: 10px 14px;
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
+    min-height: 44px;
+    min-width: 44px;
   }
 
   .control:focus {
