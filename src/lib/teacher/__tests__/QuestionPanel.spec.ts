@@ -1,3 +1,4 @@
+import { render, screen, within } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 import { get } from 'svelte/store';
 
@@ -9,6 +10,7 @@ import {
   updateBloomFilter,
   updateDifficultyFilter
 } from '../questionPanelState';
+import QuestionPanel from '../QuestionPanel.svelte';
 
 describe('question panel state', () => {
   it('computes roving tabindex focus without mutating selection', () => {
@@ -78,5 +80,37 @@ describe('question panel state', () => {
     analyzeChip.remove();
     allDifficultyChip.remove();
     allBloomChip.remove();
+  });
+
+  it('retains reading section metadata for filtered questions', () => {
+    const { selectedTabId, bloomFilter, filteredQuestions } = createQuestionPanelStores();
+    selectedTabId.set('mcq');
+    bloomFilter.set('Analyze');
+
+    const filtered = get(filteredQuestions);
+    expect(filtered).toHaveLength(1);
+    const question = filtered[0];
+    expect(question.readingSection.title).toBe('Implementation');
+    expect(question.textSpan.startOffset).toBeGreaterThan(0);
+    expect(question.textSpan.text).toContain('Bakers received flour allocations');
+  });
+});
+
+describe('QuestionPanel component', () => {
+  it('renders accessible source location details with section and offsets', () => {
+    render(QuestionPanel);
+
+    const firstTabPanel = screen.getByRole('tabpanel', { name: /multiple choice/i });
+    const firstQuestion = within(firstTabPanel).getAllByRole('listitem')[0];
+
+    const locationHeading = within(firstQuestion).getByRole('heading', { name: /source location/i });
+    expect(locationHeading).toBeInTheDocument();
+
+    expect(within(firstQuestion).getByText('Implementation', { exact: false })).toBeVisible();
+    expect(within(firstQuestion).getByText('2', { exact: false })).toBeVisible();
+
+    const offsets = within(firstQuestion).getByText(/12–168/);
+    expect(offsets).toBeVisible();
+    expect(within(firstQuestion).getByText(/coupons were issued/i)).toBeVisible();
   });
 });
