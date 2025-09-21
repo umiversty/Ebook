@@ -130,3 +130,35 @@ if __name__=="__main__":
 
     print("📄 Extracting PDF content...")
     pages = extract_pdf_text(pdf_path)
+    if not pages or all(not (page.get("text") or "").strip() for page in pages):
+        print("⚠️ No extractable text found in the provided PDF. Exiting without generating questions.")
+        raise SystemExit(1)
+
+    print("✂️ Chunking and summarizing content...")
+    chunks = chunk_and_summarize(pages)
+    if not chunks:
+        print("⚠️ No chunks were produced from the PDF content. Exiting without generating questions.")
+        raise SystemExit(1)
+
+    print(f"🧠 Loading model '{model_name}' from LM Studio...")
+    if hasattr(client, "load_model"):
+        model = client.load_model(model_name)
+    elif hasattr(client, "get_model"):
+        model = client.get_model(model_name)
+    elif hasattr(client, "models") and hasattr(client.models, "load"):
+        model = client.models.load(model_name)
+    else:
+        raise AttributeError("LM Studio Client does not provide a recognized model-loading helper.")
+
+    print("❓ Generating questions for each chunk...")
+    questions = generate_questions_for_pdf_local(chunks, model=model)
+
+    json_output_path = "pdf_questions.json"
+    csv_output_path = "pdf_questions.csv"
+    save_questions_json(questions, output_path=json_output_path)
+    save_questions_csv(questions, output_path=csv_output_path)
+
+    print(
+        "📝 Generation complete. Questions saved to "
+        f"JSON: {os.path.abspath(json_output_path)} | CSV: {os.path.abspath(csv_output_path)}"
+    )
