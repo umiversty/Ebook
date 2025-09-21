@@ -221,7 +221,11 @@
   }
 
   .tab:focus {
-    outline: 2px solid #7c9cff;
+    outline: none;
+  }
+
+  .tab:focus-visible {
+    outline: 4px solid rgba(195, 212, 255, 0.9);
     outline-offset: 2px;
   }
 
@@ -282,8 +286,11 @@
   }
 
   .chip:focus {
-    outline: 2px solid #7c9cff;
-    outline-offset: 2px;
+    outline: none;
+  }
+
+  .chip:focus-visible {
+    box-shadow: 0 0 0 4px rgba(124, 156, 255, 0.6);
   }
 
   .chip.active {
