@@ -21,9 +21,15 @@ Historians point out that rationing systems are often perceived as unfair in the
 
   let evidence: Evidence[] = [];
   let dwellMs = 0;
-  let timer: any;
-  onMount(() => { timer = setInterval(() => (dwellMs += 1000), 1000); });
-  function destroy() { clearInterval(timer); }
+  onMount(() => {
+    const interval = setInterval(() => {
+      dwellMs += 1000;
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  });
 
   function percentDone() { return Math.round((tasks.filter((t) => t.done).length / tasks.length) * 100); }
 
