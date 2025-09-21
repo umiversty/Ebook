@@ -1,8 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import EpubReader from './src/lib/epub/EpubReader.svelte';
-  import { sampleLandmarks, samplePages, sampleToc } from './src/lib/epub/sampleData';
-  import type { EvidenceCapturePayload, EpubHeading } from './src/lib/epub/types';
+
 
   // ---------------- Types ----------------
   type Task = { id: string; type: 'highlight' | 'short' | 'vocab'; prompt: string; done?: boolean; answer?: string };
@@ -11,6 +9,21 @@
 
   // --------------- State -----------------
   let screen: 'student' | 'teacher' = 'student';
+  const MIN_PX = MIN_COLUMN_PX;
+  const BREAKPOINT = 720;
+  const KEYBOARD_STEP = 32;
+  const PREFERS_REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+  let leftWidth = 0.62;
+  let rightWidth = 0.38;
+  let containerWidth = 0;
+  let isSingleColumn = false;
+  let prefersReducedMotion = false;
+  let studentGridEl: HTMLDivElement | null = null;
+  let separatorEl: HTMLDivElement | null = null;
+  let activePointerId: number | null = null;
+  let isDragging = false;
+  let dragFrame: number | null = null;
   let title = 'Colonial Rationing Case Study';
 
   let tasks: Task[] = [
@@ -28,8 +41,48 @@
       dwellMs += 1000;
     }, 1000);
 
+    const gridEl = studentGridEl;
+    if (gridEl) {
+      const initialWidth = gridEl.getBoundingClientRect().width;
+      if (initialWidth) applyContainerMetrics(initialWidth);
+    }
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (gridEl && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        applyContainerMetrics(entry.contentRect.width);
+      });
+      resizeObserver.observe(gridEl);
+    }
+
+    let motionListenerCleanup: (() => void) | null = null;
+    if (typeof window !== 'undefined' && 'matchMedia' in window) {
+      const motionQuery = window.matchMedia(PREFERS_REDUCED_MOTION_QUERY);
+      prefersReducedMotion = motionQuery.matches;
+      const handleMotionChange = (event: MediaQueryListEvent) => {
+        prefersReducedMotion = event.matches;
+      };
+      if ('addEventListener' in motionQuery) {
+        motionQuery.addEventListener('change', handleMotionChange);
+        motionListenerCleanup = () => motionQuery.removeEventListener('change', handleMotionChange);
+      } else {
+        motionQuery.addListener(handleMotionChange);
+        motionListenerCleanup = () => motionQuery.removeListener(handleMotionChange);
+      }
+    }
+
     return () => {
       clearInterval(interval);
+      if (resizeObserver) resizeObserver.disconnect();
+      if (motionListenerCleanup) motionListenerCleanup();
+      cancelDragFrame();
+      if (separatorEl && activePointerId !== null && separatorEl.hasPointerCapture(activePointerId)) {
+        separatorEl.releasePointerCapture(activePointerId);
+      }
+      activePointerId = null;
+      isDragging = false;
     };
   });
 
@@ -59,6 +112,125 @@
       task.id === id ? { ...task, answer: val, done: trimmed.length > 3 } : task
     );
   }
+
+  function cancelDragFrame() {
+    if (dragFrame !== null && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(dragFrame);
+    }
+    dragFrame = null;
+  }
+
+  function applyContainerMetrics(width: number) {
+    containerWidth = width;
+    isSingleColumn = width < BREAKPOINT || width <= MIN_PX * 2;
+  }
+
+  function setLeftByPx(px: number, width = containerWidth) {
+    if (!width || width <= MIN_PX * 2) return;
+    const safePx = clampColumnPx(px, width);
+    const ratio = pxToFraction(safePx, width);
+    leftWidth = ratio;
+    rightWidth = 1 - ratio;
+  }
+
+  function adjustWidthBy(deltaPx: number) {
+    const width = containerWidth;
+    if (!width || width <= MIN_PX * 2) return;
+    const nextFraction = applyKeyboardResize(normalizedLeft, width, deltaPx);
+    leftWidth = nextFraction;
+    rightWidth = 1 - nextFraction;
+  }
+
+  function updateFromClientX(clientX: number) {
+    if (!studentGridEl) return;
+    const rect = studentGridEl.getBoundingClientRect();
+    const width = rect.width;
+    if (!width || width <= MIN_PX * 2) return;
+    applyContainerMetrics(width);
+    const raw = clientX - rect.left;
+    const safe = clampColumnPx(raw, width);
+    setLeftByPx(safe, width);
+  }
+
+  function schedulePointerUpdate(clientX: number) {
+    if (prefersReducedMotion || typeof requestAnimationFrame !== 'function') {
+      updateFromClientX(clientX);
+      return;
+    }
+    cancelDragFrame();
+    dragFrame = requestAnimationFrame(() => {
+      dragFrame = null;
+      updateFromClientX(clientX);
+    });
+  }
+
+  function onPointerDown(event: PointerEvent) {
+    if (isSingleColumn) return;
+    event.preventDefault();
+    activePointerId = event.pointerId;
+    isDragging = true;
+    separatorEl?.setPointerCapture(activePointerId);
+    schedulePointerUpdate(event.clientX);
+  }
+
+  function onPointerMove(event: PointerEvent) {
+    if (!isDragging || event.pointerId !== activePointerId) return;
+    schedulePointerUpdate(event.clientX);
+  }
+
+  function onPointerUp(event: PointerEvent) {
+    if (!isDragging || event.pointerId !== activePointerId) return;
+    schedulePointerUpdate(event.clientX);
+    if (separatorEl?.hasPointerCapture(activePointerId)) {
+      separatorEl.releasePointerCapture(activePointerId);
+    }
+    isDragging = false;
+    activePointerId = null;
+    cancelDragFrame();
+  }
+
+  function onLostPointerCapture() {
+    isDragging = false;
+    activePointerId = null;
+    cancelDragFrame();
+  }
+
+  function onHandleKeydown(event: KeyboardEvent) {
+    if (isSingleColumn) return;
+    if (!containerWidth || containerWidth <= MIN_PX * 2) return;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      event.preventDefault();
+      const delta = event.key === 'ArrowLeft' ? -KEYBOARD_STEP : KEYBOARD_STEP;
+      adjustWidthBy(delta);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      setLeftByPx(MIN_PX);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      setLeftByPx(containerWidth - MIN_PX);
+    }
+  }
+
+  $: if (isSingleColumn) {
+    cancelDragFrame();
+    if (separatorEl && activePointerId !== null && separatorEl.hasPointerCapture(activePointerId)) {
+      separatorEl.releasePointerCapture(activePointerId);
+    }
+    activePointerId = null;
+    isDragging = false;
+  }
+
+  $: totalRatio = leftWidth + rightWidth || 1;
+  $: normalizedLeft = totalRatio === 0 ? 0.5 : leftWidth / totalRatio;
+  $: normalizedRight = totalRatio === 0 ? 0.5 : rightWidth / totalRatio;
+  $: gridTemplate = isSingleColumn
+    ? 'minmax(0, 1fr)'
+    : `minmax(${MIN_PX}px, ${normalizedLeft}fr) minmax(${MIN_PX}px, ${normalizedRight}fr)`;
+  $: effectiveWidth = containerWidth > 0 ? containerWidth : MIN_PX * 2;
+  $: currentLeftPx = fractionToPx(normalizedLeft, effectiveWidth);
+  $: ariaValueNow = Math.round(clampColumnPx(currentLeftPx, effectiveWidth));
+  $: ariaValueMax = effectiveWidth > MIN_PX * 2 ? Math.round(effectiveWidth - MIN_PX) : MIN_PX;
+  $: handlePosition = `${normalizedLeft * 100}%`;
 
   // ---------- Teacher data ----------
   let rows: StudentRow[] = [
@@ -110,7 +282,9 @@
   .wrap { padding: 24px; max-width: 1200px; margin: 0 auto; }
   .card { background: #0f1428; border-radius: 16px; padding: 16px; }
   .grid { display:grid; gap:16px; }
-  .two { grid-template-columns: 1fr 360px; }
+  .student-grid { position: relative; align-items: start; }
+  .student-grid.single-column { grid-template-columns: minmax(0, 1fr); }
+  .student-grid.single-column .separator-handle { display: none; }
   .title { font-size: 1.25rem; font-weight: 700; }
   .muted { color: #9aa3b2; }
   .btn { background: #7c9cff; color:#0b1020; border:none; padding:10px 14px; border-radius:10px; font-weight:700; cursor:pointer; }
@@ -125,6 +299,10 @@
   .bar { height: 100%; background: #3ddc97; width: 0%; transition: width .3s ease; }
   .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; }
   .modal { width: 900px; max-width: 95vw; }
+  .separator-handle { position: absolute; top: 0; bottom: 0; width: 12px; left: 50%; transform: translateX(-50%); cursor: col-resize; display: flex; align-items: center; justify-content: center; touch-action: none; border-radius: 999px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.08); }
+  .separator-handle:focus { outline: 2px solid #7c9cff; outline-offset: 2px; }
+  .separator-handle:active { background: rgba(124,156,255,0.25); }
+  .separator-grip { width: 2px; height: 48px; background: rgba(255,255,255,0.4); border-radius: 999px; }
 </style>
 
 <div class="wrap">
@@ -150,8 +328,14 @@
 
   {#if screen==='student'}
     <!-- Student: Interactive Reader -->
-    <div class="grid two">
-      <main class="card">
+    <div
+      class="grid student-grid"
+      class:single-column={isSingleColumn}
+      bind:this={studentGridEl}
+      data-testid="student-grid"
+      style={`grid-template-columns:${gridTemplate}`}
+    >
+      <main class="card" id="student-reading-pane">
         <div class="title" style="margin-bottom:4px;">{title}</div>
         <div class="muted" style="margin-bottom:12px;">Read naturally; complete tasks as you go. Highlights count as evidence.</div>
 
@@ -184,7 +368,31 @@
         </div>
       </main>
 
-      <aside class="card drawer" aria-label="Tasks panel">
+      {#if !isSingleColumn}
+        <div
+          class="separator-handle"
+          bind:this={separatorEl}
+          role="separator"
+          aria-label="Resize reading and tasks panels"
+          aria-controls="student-reading-pane student-tasks-pane"
+          aria-orientation="vertical"
+          aria-valuemin={MIN_PX}
+          aria-valuemax={ariaValueMax}
+          aria-valuenow={ariaValueNow}
+          tabindex="0"
+          style={`left:${handlePosition}`}
+          on:pointerdown={onPointerDown}
+          on:pointermove={onPointerMove}
+          on:pointerup={onPointerUp}
+          on:pointercancel={onPointerUp}
+          on:lostpointercapture={onLostPointerCapture}
+          on:keydown={onHandleKeydown}
+        >
+          <span class="separator-grip" aria-hidden="true"></span>
+        </div>
+      {/if}
+
+      <aside class="card drawer" id="student-tasks-pane" aria-label="Tasks panel">
         <div class="title" style="margin-bottom:8px;">Tasks</div>
         <div class="muted" style="margin-bottom:8px;">Progress</div>
         <div class="progress"><div class="bar" style={`width:${percentDone()}%`}></div></div>
