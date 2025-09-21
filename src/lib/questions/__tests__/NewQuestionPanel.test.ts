@@ -4,6 +4,13 @@ import { tick } from 'svelte';
 import { describe, expect, it } from 'vitest';
 import NewQuestionPanel from '../NewQuestionPanel.svelte';
 import type { GeneratedQuestion } from '../NewQuestionPanel.svelte';
+import { sampleReadingSections } from '../../teacher/questionPanelState';
+
+const evidenceSpan = {
+  startOffset: 32,
+  endOffset: 144,
+  text: 'Bakers received flour allocations tied to reported demand, recorded by inspectors in weekly ledgers.'
+};
 
 const sampleQuestions: GeneratedQuestion[] = [
   {
@@ -11,14 +18,18 @@ const sampleQuestions: GeneratedQuestion[] = [
     stem: 'Why did the council choose rationing as the primary policy response?',
     hint: 'Consider the competing priorities voiced by merchants and officials.',
     answer: 'Rationing balanced equitable distribution with market stability amid scarcity.',
-    whyThisMatters: 'Shows how policy makers reconcile fairness with economic pressures.'
+    whyThisMatters: 'Shows how policy makers reconcile fairness with economic pressures.',
+    readingSection: sampleReadingSections.implementation,
+    textSpan: evidenceSpan
   },
   {
     id: 'question-2',
     stem: 'What evidence challenged the rumors of favoritism?',
     hint: 'Look at the audits that followed implementation.',
     answer: 'Audits contradicted favoritism claims and urged clearer public messaging.',
-    whyThisMatters: 'Highlights the importance of transparency and documentation in public policy.'
+    whyThisMatters: 'Highlights the importance of transparency and documentation in public policy.',
+    readingSection: sampleReadingSections.audits,
+    textSpan: evidenceSpan
   }
 ];
 
@@ -95,5 +106,26 @@ describe('NewQuestionPanel', () => {
       'aria-expanded',
       'false'
     );
+  });
+
+  it('renders source location metadata for each question', () => {
+    render(NewQuestionPanel, { props: { questions: sampleQuestions } });
+
+    const firstCard = screen.getAllByRole('article')[0];
+    const locationHeading = within(firstCard).getByRole('heading', { name: /source location/i });
+    expect(locationHeading).toBeInTheDocument();
+
+    expect(
+      within(firstCard).getByText(sampleQuestions[0].readingSection.title, { exact: false })
+    ).toBeVisible();
+
+    expect(
+      within(firstCard).getByText(sampleQuestions[0].readingSection.pageLabel, { exact: false })
+    ).toBeVisible();
+
+    const offsetValue = `${sampleQuestions[0].textSpan.startOffset}–${sampleQuestions[0].textSpan.endOffset}`;
+    expect(within(firstCard).getByText(offsetValue)).toBeVisible();
+
+    expect(within(firstCard).getByText(sampleQuestions[0].textSpan.text, { exact: false })).toBeVisible();
   });
 });
