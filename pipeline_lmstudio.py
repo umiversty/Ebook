@@ -4,9 +4,10 @@
 # Setup
 # --------------------------
 
-    nlp = None
+
 OUTPUT_IMAGE_DIR = "output_images"
 os.makedirs(OUTPUT_IMAGE_DIR, exist_ok=True)
+
 
 
 client = Client() if Client is not None else None
@@ -21,7 +22,6 @@ def clean_text(text):
 def extract_keywords_and_entities(text):
     if nlp is None:
 
-    keywords = [token.text for token in doc if token.pos_ in ("NOUN", "PROPN")]
     return list(set(keywords)), entities
 
 # --------------------------
@@ -29,11 +29,6 @@ def extract_keywords_and_entities(text):
 # --------------------------
 def extract_pdf_text(pdf_path):
 
-        for page in pdf.pages:
-            text = page.extract_text() or ""
-            text = clean_text(text)
-            pages.append({"text": text})
-    return pages
 
 # --------------------------
 # Chunking + metadata
@@ -56,10 +51,6 @@ def chunk_and_summarize(pages, max_words=500):
     return chunks
 
 
-def generate_questions_for_pdf_local(chunks, model, max_questions_per_chunk=3):
-    all_questions=[]
-    for idx, chunk in enumerate(chunks, start=1):
-        q_chunk = generate_questions_local(chunk, model, max_questions=max_questions_per_chunk)
 
                 "summary": chunk.get("summary",""),
                 "keywords": chunk.get("keywords",[]),
@@ -75,18 +66,13 @@ def save_questions_json(questions, output_path="pdf_questions.json"):
         json.dump(questions,f,indent=2,ensure_ascii=False)
     print(f"✅ Saved {len(questions)} questions to {output_path}")
 
-def save_questions_csv(questions, output_path="pdf_questions.csv"):
-    with open(output_path,"w",newline="",encoding="utf-8") as csvfile:
-        fieldnames=[
+
 
             "summary",
             "keywords",
             "entities",
         ]
-        writer=csv.DictWriter(csvfile,fieldnames=fieldnames)
-        writer.writeheader()
-        for q in questions:
-            writer.writerow({
+
 
                 "summary":q["summary"],
                 "keywords":"; ".join(q["keywords"]),
@@ -100,6 +86,7 @@ def save_questions_csv(questions, output_path="pdf_questions.csv"):
 if __name__=="__main__":
     pdf_path="sample.pdf"  # Replace with your PDF
     model_name="mistral-nemo-instruct-2407"
+
 
     print("📄 Extracting PDF content...")
     pages = extract_pdf_text(pdf_path)
@@ -128,7 +115,7 @@ if __name__=="__main__":
         raise AttributeError("LM Studio Client does not provide a recognized model-loading helper.")
 
     print("❓ Generating questions for each chunk...")
-    questions = generate_questions_for_pdf_local(chunks, model=model)
+
 
     json_output_path = "pdf_questions.json"
     csv_output_path = "pdf_questions.csv"
