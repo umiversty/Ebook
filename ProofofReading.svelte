@@ -1,4 +1,8 @@
 <script lang="ts">
+  import EpubReader from './src/lib/epub/EpubReader.svelte';
+  import { sampleLandmarks, samplePages, sampleToc } from './src/lib/epub/sampleData.js';
+  import type { EpubHeading, EvidenceCapturePayload } from './src/lib/epub/types.js';
+  import { applyKeyboardResize, clampColumnPx, fractionToPx, MIN_COLUMN_PX, pxToFraction } from './splitLayout';
   import { onMount } from 'svelte';
 
 
@@ -36,10 +40,56 @@
   let currentHeading: EpubHeading | null = samplePages[0]?.headings[0] ?? null;
   let currentPageId: string | null = samplePages[0]?.id ?? null;
   let dwellMs = 0;
+  let viewportWidth = typeof window !== 'undefined' ? window.innerWidth : BREAKPOINT;
+
+  type BreadcrumbNode = { id: string; label: string; href: string; isCurrent?: boolean };
+  const COURSE_BREADCRUMB: BreadcrumbNode = {
+    id: 'course',
+    label: 'AP U.S. History',
+    href: '#course'
+  };
+  const UNIT_BREADCRUMB: BreadcrumbNode = {
+    id: 'unit',
+    label: 'Unit 7 · Domestic Impacts',
+    href: '#unit'
+  };
+  const PROGRESS_RING_RADIUS = 20;
+  const PROGRESS_RING_STROKE = 4;
+  const PROGRESS_RING_DIAMETER = PROGRESS_RING_RADIUS * 2 + PROGRESS_RING_STROKE * 2;
+  const PROGRESS_RING_CIRCUMFERENCE = 2 * Math.PI * PROGRESS_RING_RADIUS;
+  const BREADCRUMB_SEPARATOR = ' › ';
+
+  function syncViewportWidth() {
+    if (typeof window === 'undefined') return;
+    viewportWidth = window.innerWidth;
+  }
+
+  function resolveSectionLabel(heading: EpubHeading | null, chapterTitle: string): string {
+    if (!heading) return 'Section overview';
+    if (heading.text.trim() === chapterTitle.trim()) {
+      return 'Overview';
+    }
+    return heading.text;
+  }
+  let chapterBreadcrumb: BreadcrumbNode = { id: 'chapter', label: title, href: '#chapter' };
+  let sectionBreadcrumb: BreadcrumbNode = {
+    id: 'section',
+    label: resolveSectionLabel(currentHeading, title),
+    href: '#section',
+    isCurrent: true
+  };
+  let breadcrumbTrail: BreadcrumbNode[] = [COURSE_BREADCRUMB, UNIT_BREADCRUMB, chapterBreadcrumb, sectionBreadcrumb];
+  let isMobileBreadcrumb = viewportWidth < BREAKPOINT;
+  let visibleBreadcrumbTrail: BreadcrumbNode[] = breadcrumbTrail;
+  let hiddenBreadcrumbTrail: BreadcrumbNode[] = [];
+  let breadcrumbAriaLabel = `Course navigation: ${breadcrumbTrail.map((crumb) => crumb.label).join(BREADCRUMB_SEPARATOR)}`;
+  let hiddenBreadcrumbLabel = '';
   onMount(() => {
     const interval = setInterval(() => {
       dwellMs += 1000;
     }, 1000);
+
+    syncViewportWidth();
 
     const gridEl = studentGridEl;
     if (gridEl) {
@@ -48,6 +98,7 @@
     }
 
     let resizeObserver: ResizeObserver | null = null;
+    let viewportResizeCleanup: (() => void) | null = null;
     if (gridEl && typeof ResizeObserver !== 'undefined') {
       resizeObserver = new ResizeObserver((entries) => {
         const entry = entries[0];
@@ -55,6 +106,14 @@
         applyContainerMetrics(entry.contentRect.width);
       });
       resizeObserver.observe(gridEl);
+    }
+
+    if (typeof window !== 'undefined') {
+      const handleViewportResize = () => {
+        syncViewportWidth();
+      };
+      window.addEventListener('resize', handleViewportResize);
+      viewportResizeCleanup = () => window.removeEventListener('resize', handleViewportResize);
     }
 
     let motionListenerCleanup: (() => void) | null = null;
@@ -76,6 +135,7 @@
     return () => {
       clearInterval(interval);
       if (resizeObserver) resizeObserver.disconnect();
+      if (viewportResizeCleanup) viewportResizeCleanup();
       if (motionListenerCleanup) motionListenerCleanup();
       cancelDragFrame();
       if (separatorEl && activePointerId !== null && separatorEl.hasPointerCapture(activePointerId)) {
@@ -86,7 +146,10 @@
     };
   });
 
-  function percentDone() { return Math.round((tasks.filter((t) => t.done).length / tasks.length) * 100); }
+  function percentDone() {
+    if (tasks.length === 0) return 0;
+    return Math.round((tasks.filter((t) => t.done).length / tasks.length) * 100);
+  }
 
   function handleEvidenceCapture(event: CustomEvent<{ payload: EvidenceCapturePayload }>) {
     const payload = event.detail.payload;
@@ -231,6 +294,25 @@
   $: ariaValueNow = Math.round(clampColumnPx(currentLeftPx, effectiveWidth));
   $: ariaValueMax = effectiveWidth > MIN_PX * 2 ? Math.round(effectiveWidth - MIN_PX) : MIN_PX;
   $: handlePosition = `${normalizedLeft * 100}%`;
+  $: progressPercent = percentDone();
+  $: progressDashOffset = PROGRESS_RING_CIRCUMFERENCE - (progressPercent / 100) * PROGRESS_RING_CIRCUMFERENCE;
+  $: chapterBreadcrumb = { id: 'chapter', label: title, href: '#chapter' };
+  $: sectionBreadcrumb = {
+    id: 'section',
+    label: resolveSectionLabel(currentHeading, title),
+    href: '#section',
+    isCurrent: true
+  };
+  $: breadcrumbTrail = [COURSE_BREADCRUMB, UNIT_BREADCRUMB, chapterBreadcrumb, sectionBreadcrumb];
+  $: isMobileBreadcrumb = viewportWidth < BREAKPOINT;
+  $: visibleBreadcrumbTrail = isMobileBreadcrumb && breadcrumbTrail.length > 2
+    ? breadcrumbTrail.slice(-2)
+    : breadcrumbTrail;
+  $: hiddenBreadcrumbTrail = isMobileBreadcrumb && breadcrumbTrail.length > visibleBreadcrumbTrail.length
+    ? breadcrumbTrail.slice(0, breadcrumbTrail.length - visibleBreadcrumbTrail.length)
+    : [];
+  $: breadcrumbAriaLabel = `Course navigation: ${breadcrumbTrail.map((crumb) => crumb.label).join(BREADCRUMB_SEPARATOR)}`;
+  $: hiddenBreadcrumbLabel = hiddenBreadcrumbTrail.map((crumb) => crumb.label).join(BREADCRUMB_SEPARATOR);
 
   // ---------- Teacher data ----------
   let rows: StudentRow[] = [
@@ -280,6 +362,32 @@
   :global(body) { background: #0b1020; color: #e6e9ef; margin: 0; }
 
   .wrap { padding: 24px; max-width: 1200px; margin: 0 auto; }
+  .page-header { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+  .page-header__top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .page-header__bottom { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .page-title { margin: 0; flex: 1 1 auto; min-width: 0; }
+  .breadcrumb { flex: 1 1 auto; min-width: 0; }
+  .breadcrumb__list { display: flex; align-items: center; list-style: none; margin: 0; padding: 0; overflow: hidden; }
+  .breadcrumb__item { display: flex; align-items: center; min-width: 0; }
+  .breadcrumb__item + .breadcrumb__item::before { content: '›'; color: #5c6578; margin: 0 8px; }
+  .breadcrumb__link { background: none; border: none; color: #e6e9ef; font: inherit; text-decoration: none; padding: 4px 0; cursor: pointer; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+  .breadcrumb__link:hover, .breadcrumb__link:focus { text-decoration: underline; }
+  .breadcrumb__link:focus-visible { outline: 2px solid #7c9cff; outline-offset: 2px; }
+  .breadcrumb__link--current { font-weight: 600; }
+  .breadcrumb__item--overflow > .breadcrumb__link { width: 2.25rem; justify-content: center; }
+  .breadcrumb__link--overflow { font-size: 1.25rem; line-height: 1; }
+  .toggle-label { display: flex; align-items: center; gap: 4px; }
+  .progress-ring { position: relative; width: 64px; height: 64px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .progress-ring__svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .progress-ring__circle { fill: none; stroke-linecap: round; }
+  .progress-ring__circle--bg { stroke: rgba(230, 233, 239, 0.2); }
+  .progress-ring__circle--value { stroke: #3ddc97; transition: stroke-dashoffset 0.3s ease; }
+  .progress-ring__value { position: absolute; font-size: 0.875rem; font-weight: 600; }
+  @media (max-width: 720px) {
+    .page-header__top { align-items: flex-start; }
+    .breadcrumb__link { max-width: 140px; }
+    .progress-ring { width: 56px; height: 56px; }
+  }
   .card { background: #0f1428; border-radius: 16px; padding: 16px; }
   .grid { display:grid; gap:16px; }
   .student-grid { position: relative; align-items: start; }
@@ -306,25 +414,86 @@
 </style>
 
 <div class="wrap">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-    <div class="title">Proof‑of‑Reading LMS (Wireframes)</div>
-
-    <div class="right">
-      <label style="display:flex;align-items:center;gap:4px;">
-        <input type="checkbox" bind:checked={featureFlags.premium} /> Premium Mode
-      </label>
-      <label style="display:flex;align-items:center;gap:4px;">
-        <input type="checkbox" bind:checked={skimEnabled} disabled={!featureFlags.premium} /> Skim Alerts
-      </label>
-
-      <!-- DEV buttons to simulate non-demo flags -->
-      <button class="btn secondary" on:click={() => seedRealFlag('Chris T.', 'Skim (real)')}>DEV: Seed Real Flag (Chris)</button>
-      <button class="btn secondary" on:click={clearRealFlags}>DEV: Clear Real Flags</button>
-
-      <button class="btn secondary" on:click={() => screen='student'}>Student View</button>
-      <button class="btn" on:click={() => screen='teacher'}>Teacher Dashboard</button>
+  <header class="page-header">
+    <div class="page-header__top">
+      <nav class="breadcrumb" aria-label={breadcrumbAriaLabel}>
+        <ol class="breadcrumb__list">
+          {#if hiddenBreadcrumbTrail.length}
+            <li class="breadcrumb__item breadcrumb__item--overflow">
+              <button
+                type="button"
+                class="breadcrumb__link breadcrumb__link--overflow"
+                aria-label={`Previous levels: ${hiddenBreadcrumbLabel}`}
+                title={hiddenBreadcrumbLabel}
+              >
+                …
+              </button>
+            </li>
+          {/if}
+          {#each visibleBreadcrumbTrail as crumb (crumb.id)}
+            <li class="breadcrumb__item">
+              <a
+                class={`breadcrumb__link${crumb.isCurrent ? ' breadcrumb__link--current' : ''}`}
+                href={crumb.href}
+                aria-current={crumb.isCurrent ? 'page' : undefined}
+                title={crumb.label}
+              >
+                {crumb.label}
+              </a>
+            </li>
+          {/each}
+        </ol>
+      </nav>
+      <div
+        class="progress-ring"
+        role="img"
+        aria-label={`Session progress: ${progressPercent}% complete`}
+      >
+        <svg
+          class="progress-ring__svg"
+          viewBox={`0 0 ${PROGRESS_RING_DIAMETER} ${PROGRESS_RING_DIAMETER}`}
+          aria-hidden="true"
+        >
+          <circle
+            class="progress-ring__circle progress-ring__circle--bg"
+            cx={PROGRESS_RING_DIAMETER / 2}
+            cy={PROGRESS_RING_DIAMETER / 2}
+            r={PROGRESS_RING_RADIUS}
+            stroke-width={PROGRESS_RING_STROKE}
+          />
+          <circle
+            class="progress-ring__circle progress-ring__circle--value"
+            cx={PROGRESS_RING_DIAMETER / 2}
+            cy={PROGRESS_RING_DIAMETER / 2}
+            r={PROGRESS_RING_RADIUS}
+            stroke-width={PROGRESS_RING_STROKE}
+            stroke-dasharray={`${PROGRESS_RING_CIRCUMFERENCE} ${PROGRESS_RING_CIRCUMFERENCE}`}
+            stroke-dashoffset={progressDashOffset}
+          />
+        </svg>
+        <span class="progress-ring__value">{progressPercent}%</span>
+      </div>
     </div>
-  </div>
+    <div class="page-header__bottom">
+      <h1 class="title page-title">Proof‑of‑Reading LMS (Wireframes)</h1>
+
+      <div class="right">
+        <label class="toggle-label">
+          <input type="checkbox" bind:checked={featureFlags.premium} /> Premium Mode
+        </label>
+        <label class="toggle-label">
+          <input type="checkbox" bind:checked={skimEnabled} disabled={!featureFlags.premium} /> Skim Alerts
+        </label>
+
+        <!-- DEV buttons to simulate non-demo flags -->
+        <button class="btn secondary" on:click={() => seedRealFlag('Chris T.', 'Skim (real)')}>DEV: Seed Real Flag (Chris)</button>
+        <button class="btn secondary" on:click={clearRealFlags}>DEV: Clear Real Flags</button>
+
+        <button class="btn secondary" on:click={() => screen='student'}>Student View</button>
+        <button class="btn" on:click={() => screen='teacher'}>Teacher Dashboard</button>
+      </div>
+    </div>
+  </header>
 
   {#if screen==='student'}
     <!-- Student: Interactive Reader -->
@@ -395,7 +564,7 @@
       <aside class="card drawer" id="student-tasks-pane" aria-label="Tasks panel">
         <div class="title" style="margin-bottom:8px;">Tasks</div>
         <div class="muted" style="margin-bottom:8px;">Progress</div>
-        <div class="progress"><div class="bar" style={`width:${percentDone()}%`}></div></div>
+        <div class="progress"><div class="bar" style={`width:${progressPercent}%`}></div></div>
         <div class="muted" style="margin:8px 0 16px 0;">{tasks.filter(t=>t.done).length}/{tasks.length} completed • {Math.floor(dwellMs/60_000)}m spent</div>
 
         <!-- Task list -->
