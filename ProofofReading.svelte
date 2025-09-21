@@ -408,8 +408,9 @@
   .bar { height: 100%; background: #3ddc97; width: 0%; transition: width .3s ease; }
   .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; }
   .modal { width: 900px; max-width: 95vw; }
-  .separator-handle { position: absolute; top: 0; bottom: 0; width: 12px; left: 50%; transform: translateX(-50%); cursor: col-resize; display: flex; align-items: center; justify-content: center; touch-action: none; border-radius: 999px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.08); }
-  .separator-handle:focus { outline: 2px solid #7c9cff; outline-offset: 2px; }
+  .separator-handle { position: absolute; top: 0; bottom: 0; width: 12px; padding: 0 6px; left: 50%; transform: translateX(-50%); cursor: col-resize; display: flex; align-items: center; justify-content: center; touch-action: none; border-radius: 999px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.08); box-sizing: content-box; }
+  .separator-handle:focus { outline: none; }
+  .separator-handle:focus-visible { outline: 4px solid #7c9cff; outline-offset: 2px; box-shadow: 0 0 0 4px rgba(124,156,255,0.35); }
   .separator-handle:active { background: rgba(124,156,255,0.25); }
   .separator-grip { width: 2px; height: 48px; background: rgba(255,255,255,0.4); border-radius: 999px; }
 </style>
