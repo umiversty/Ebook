@@ -1,32 +1,9 @@
-import os
-import re
-import json
-import csv
-from dataclasses import dataclass
-from typing import Dict, Iterable, Optional
 
-try:
-    import pdfplumber
-except ImportError:  # pragma: no cover - optional dependency during tests
-    pdfplumber = None
-
-try:
-    import spacy
-except ImportError:  # pragma: no cover - optional dependency during tests
-    spacy = None
-
-from lmstudio import Client  # LM Studio 2025+ SDK
 
 # --------------------------
 # Setup
 # --------------------------
-if spacy is None:  # pragma: no cover - exercised only when spaCy unavailable
-    nlp = None
-else:
-    try:
-        nlp = spacy.load("en_core_web_sm")
-    except Exception:  # pragma: no cover - fallback for missing model at runtime
-        nlp = None
+
 OUTPUT_IMAGE_DIR = "output_images"
 os.makedirs(OUTPUT_IMAGE_DIR, exist_ok=True)
 
@@ -103,7 +80,7 @@ def load_student_profile(profile_path: Optional[str] = None) -> StudentProfile:
     return StudentProfile.default()
 
 # Initialize LM Studio client
-client = Client()
+client = Client() if Client is not None else None
 
 # --------------------------
 # Helpers
@@ -116,13 +93,6 @@ def extract_keywords_and_entities(text):
     if nlp is None:
         return [], []
 
-    doc = nlp(text)
-    entities = list(set(ent.text for ent in getattr(doc, "ents", [])))
-    keywords = [
-        token.text
-        for token in doc
-        if getattr(token, "pos_", None) in ("NOUN", "PROPN")
-    ]
     return list(set(keywords)), entities
 
 # --------------------------
@@ -134,13 +104,6 @@ def extract_pdf_text(pdf_path):
             "pdfplumber is required for PDF extraction but is not installed."
         )
 
-    pages = []
-    with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text() or ""
-            text = clean_text(text)
-            pages.append({"text": text})
-    return pages
 
 # --------------------------
 # Chunking + metadata
@@ -162,87 +125,7 @@ def chunk_and_summarize(pages, max_words=500):
             })
     return chunks
 
-# --------------------------
-# Question generation
-# --------------------------
-def estimate_bloom_level(question: str) -> str:
-    """Best-effort Bloom level heuristics using indicative verbs."""
 
-    q_lower = question.lower()
-    for keyword, level in (
-        ("define", "remember"),
-        ("list", "remember"),
-        ("describe", "understand"),
-        ("explain", "understand"),
-        ("apply", "apply"),
-        ("demonstrate", "apply"),
-        ("compare", "analyze"),
-        ("analyze", "analyze"),
-        ("evaluate", "evaluate"),
-        ("justify", "evaluate"),
-        ("design", "create"),
-        ("create", "create"),
-    ):
-        if keyword in q_lower:
-            return level
-    return "understand"
-
-
-def generate_questions_local(chunk, model, max_questions=3):
-    prompt = f"""
-You are an educational assistant generating questions.
-Chunk summary: {chunk.get('summary','')}
-
-Text content:
-{chunk.get('text','')}
-
-Instructions:
-- Generate up to {max_questions} clear educational questions.
-- Number each question.
-"""
-    response = model.generate(
-        prompt=prompt,
-        max_new_tokens=512,
-        temperature=0.7
-    )
-    questions = re.split(r"\n\d*\.?\s*", response.output_text.strip())
-    results = []
-    for q in questions:
-        q_clean = q.strip()
-        if not q_clean:
-            continue
-        results.append({
-            "question": q_clean,
-            "bloom_level": estimate_bloom_level(q_clean),
-        })
-    return results
-
-def generate_questions_for_pdf_local(
-    chunks,
-    model,
-    max_questions_per_chunk=3,
-    student_profile: Optional[StudentProfile] = None,
-):
-    all_questions=[]
-    profile = student_profile or StudentProfile.default()
-    target_band = profile.target_difficulty_band()
-    desired_levels = DIFFICULTY_BANDS.get(target_band, set())
-    for idx, chunk in enumerate(chunks, start=1):
-        q_chunk = generate_questions_local(
-            chunk, model, max_questions=max_questions_per_chunk
-        )
-        filtered: Iterable[Dict[str, str]] = (
-            q for q in q_chunk if q.get("bloom_level") in desired_levels
-        )
-        filtered_list = list(filtered)
-        if not filtered_list:
-            filtered_list = q_chunk
-        for q in filtered_list:
-            all_questions.append({
-                "chunk_idx": idx,
-                "question": q["question"],
-                "bloom_level": q.get("bloom_level", "understand"),
-                "difficulty_band": target_band,
                 "summary": chunk.get("summary",""),
                 "keywords": chunk.get("keywords",[]),
                 "entities": chunk.get("entities",[])
@@ -257,25 +140,12 @@ def save_questions_json(questions, output_path="pdf_questions.json"):
         json.dump(questions,f,indent=2,ensure_ascii=False)
     print(f"✅ Saved {len(questions)} questions to {output_path}")
 
-def save_questions_csv(questions, output_path="pdf_questions.csv"):
-    with open(output_path,"w",newline="",encoding="utf-8") as csvfile:
-        fieldnames=[
-            "chunk_idx",
-            "question",
-            "bloom_level",
-            "difficulty_band",
+
             "summary",
             "keywords",
             "entities",
         ]
-        writer=csv.DictWriter(csvfile,fieldnames=fieldnames)
-        writer.writeheader()
-        for q in questions:
-            writer.writerow({
-                "chunk_idx":q["chunk_idx"],
-                "question":q["question"],
-                "bloom_level":q.get("bloom_level", ""),
-                "difficulty_band":q.get("difficulty_band", ""),
+
                 "summary":q["summary"],
                 "keywords":"; ".join(q["keywords"]),
                 "entities":"; ".join(q["entities"])
@@ -308,6 +178,11 @@ if __name__=="__main__":
     if not chunks:
         print("⚠️ No chunks were produced from the PDF content. Exiting without generating questions.")
         raise SystemExit(1)
+
+    if client is None:
+        raise ImportError(
+            "LM Studio SDK is not installed. Install the 'lmstudio' package to generate questions."
+        )
 
     print(f"🧠 Loading model '{model_name}' from LM Studio...")
     if hasattr(client, "load_model"):
