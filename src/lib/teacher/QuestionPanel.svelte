@@ -124,8 +124,20 @@
                   class:active={$bloomFilter === chip.value}
                   aria-pressed={$bloomFilter === chip.value}
                   aria-label={chip.ariaLabel}
-                  on:click={(event) =>
-                    onBloomChipClick(chip.value, event.currentTarget as HTMLButtonElement)}
+                  <script lang="ts">
+  function handleChipClick(event: Event, value: string) {
+    const target = event.currentTarget as HTMLButtonElement;
+    onBloomChipClick(value, target);
+  }
+</script>
+
+<button
+  aria-label={chip.ariaLabel}
+  on:click={(event) => handleChipClick(event, chip.value)}
+>
+  {chip.text}
+</button>
+
                 >
                   {chip.text}
                 </button>

@@ -639,7 +639,13 @@
               <div class="muted" style="font-size:12px;">Select a sentence in the reading to complete.</div>
               {#if t.done}<div class="pill" style="margin-top:6px;background:rgba(61,220,151,.18); color: #3ddc97;">Completed</div>{/if}
             {:else}
-              <textarea class="card" rows="3" placeholder="Type your response…" on:input={(e:any)=> setAnswer(t.id, e.target.value)}>{t.answer || ''}</textarea>
+              <textarea
+  class="card"
+  rows="3"
+  placeholder="Type your response…"
+  bind:value={t.answer}
+  on:input={(e: any) => setAnswer(t.id, e.target.value)}
+></textarea>
             {/if}
           </div>
         {/each}
