@@ -60,10 +60,10 @@ Historians point out that rationing systems are often perceived as unfair in the
   }
 
   function setAnswer(id: string, val: string) {
-    const t = tasks.find((x) => x.id === id);
-    if (!t) return;
-    t.answer = val;
-    t.done = (val || '').trim().length > 3;
+    const trimmed = (val ?? '').trim();
+    tasks = tasks.map((task) =>
+      task.id === id ? { ...task, answer: val, done: trimmed.length > 3 } : task
+    );
   }
 
   // ---------- Teacher data ----------
