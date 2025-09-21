@@ -3,7 +3,7 @@
   import { sampleLandmarks, samplePages, sampleToc } from './src/lib/epub/sampleData.js';
   import type { EpubHeading, EvidenceCapturePayload } from './src/lib/epub/types.js';
   import { applyKeyboardResize, clampColumnPx, fractionToPx, MIN_COLUMN_PX, pxToFraction } from './splitLayout';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import QuestionPanel from './src/lib/teacher/QuestionPanel.svelte';
 
 
@@ -322,8 +322,46 @@
     { name: 'Chris T.', time: '14m', tasks: '6/7', quality: 'Medium' }
   ];
   let selected: StudentRow | null = null;
-  function openStudent(r: StudentRow) { selected = r; }
-  function closeStudent() { selected = null; }
+  let dialogTriggerEl: HTMLElement | null = null;
+  let closeButtonEl: HTMLButtonElement | null = null;
+  let dialogContainerEl: HTMLDivElement | null = null;
+  let pageContentEl: HTMLDivElement | null = null;
+  const dialogTitleId = 'student-drilldown-title';
+
+  function openStudent(row: StudentRow, trigger: HTMLElement | null = null) {
+    dialogTriggerEl = trigger;
+    selected = row;
+  }
+
+  async function focusDialog() {
+    await tick();
+    if (!selected) return;
+    if (closeButtonEl) {
+      closeButtonEl.focus();
+      return;
+    }
+    const fallback = dialogContainerEl?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    fallback?.focus();
+  }
+
+  async function closeStudent() {
+    if (!selected) return;
+    selected = null;
+    const trigger = dialogTriggerEl;
+    await tick();
+    trigger?.focus();
+    dialogTriggerEl = null;
+  }
+
+  function handleDialogKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeStudent();
+    }
+  }
 
   // -------- Premium & Skim controls --------
   let featureFlags = { premium: false };
@@ -350,10 +388,14 @@
     rows = rows.map(r => r.flagsDemo ? r : ({ ...r, flags: undefined }));
   }
 
-  // overlay keyboard accessibility
-  function overlayKey(e: KeyboardEvent) {
-    if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
-      closeStudent();
+  $: if (pageContentEl) {
+    if (selected) {
+      pageContentEl.setAttribute('inert', '');
+      pageContentEl.setAttribute('aria-hidden', 'true');
+      focusDialog();
+    } else {
+      pageContentEl.removeAttribute('inert');
+      pageContentEl.removeAttribute('aria-hidden');
     }
   }
 </script>
@@ -435,7 +477,8 @@
 </style>
 
 <div class="wrap">
-  <header class="page-header">
+  <div bind:this={pageContentEl}>
+    <header class="page-header">
     <div class="page-header__top">
       <nav class="breadcrumb" aria-label={breadcrumbAriaLabel}>
         <ol class="breadcrumb__list">
@@ -514,9 +557,9 @@
         <button class="btn" on:click={() => screen='teacher'}>Teacher Dashboard</button>
       </div>
     </div>
-  </header>
+    </header>
 
-  {#if screen==='student'}
+    {#if screen==='student'}
     <!-- Student: Interactive Reader -->
     <div
       class="grid student-grid"
@@ -604,9 +647,9 @@
         <button class="btn" style="width:100%; margin-top:8px;">Submit All Evidence & Answers</button>
       </aside>
     </div>
-  {/if}
+    {/if}
 
-  {#if screen==='teacher'}
+    {#if screen==='teacher'}
     <!-- Premium Settings (Skim Alerts) -->
     {#if featureFlags.premium}
       <section class="card" style="margin-bottom:16px;">
@@ -660,7 +703,15 @@
                   —
                 {/if}
               </td>
-              <td><button class="btn secondary" on:click={() => openStudent(r)}>View</button></td>
+              <td>
+                <button
+                  class="btn secondary"
+                  type="button"
+                  on:click={(event) => openStudent(r, event.currentTarget as HTMLElement)}
+                >
+                  View
+                </button>
+              </td>
             </tr>
           {/each}
         </tbody>
@@ -672,45 +723,48 @@
       </div>
     </section>
 
-    {#if selected}
-      <!-- Make overlay keyboard-accessible -->
-      <div
-        class="overlay"
-        role="button"
-        tabindex="0"
-        aria-label="Close student drilldown"
-        on:click={closeStudent}
-        on:keydown={overlayKey}
-      >
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="card modal" on:click|stopPropagation>
-          <div style="display:flex;align-items:center;justify-content:space-between; margin-bottom:8px;">
-            <div class="title">{selected.name} — Evidence Drilldown</div>
-            <button class="btn secondary" on:click={closeStudent}>Close</button>
+    {/if}
+
+  </div>
+
+  {#if screen==='teacher' && selected}
+    <!-- Make overlay keyboard-accessible -->
+    <div
+      class="overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={dialogTitleId}
+      on:click={closeStudent}
+      on:keydown={handleDialogKeydown}
+    >
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div class="card modal" bind:this={dialogContainerEl} on:click|stopPropagation>
+        <div style="display:flex;align-items:center;justify-content:space-between; margin-bottom:8px;">
+          <div class="title" id={dialogTitleId}>{selected.name} — Evidence Drilldown</div>
+          <button class="btn secondary" type="button" bind:this={closeButtonEl} on:click={closeStudent}>Close</button>
+        </div>
+
+        <div class="grid two">
+          <div class="card">
+            <div class="muted" style="margin-bottom:8px;">Reading with highlights (mock)</div>
+            <div class="hl">“failed harvest … rationing policy” <span class="pill">evidence</span></div>
+            <div class="hl">“Rumors of favoritism … audits later contradicted” <span class="pill">evidence</span></div>
           </div>
 
-          <div class="grid two">
-            <div class="card">
-              <div class="muted" style="margin-bottom:8px;">Reading with highlights (mock)</div>
-              <div class="hl">“failed harvest … rationing policy” <span class="pill">evidence</span></div>
-              <div class="hl">“Rumors of favoritism … audits later contradicted” <span class="pill">evidence</span></div>
+          <div class="card">
+            <div class="muted">Submitted answers</div>
+            <div class="card" style="margin-top:8px;">
+              <div style="font-weight:600;">Q1</div>
+              <div class="muted">Short answer: “Because the harvest failed and supplies ran low.”</div>
             </div>
-
-            <div class="card">
-              <div class="muted">Submitted answers</div>
-              <div class="card" style="margin-top:8px;">
-                <div style="font-weight:600;">Q1</div>
-                <div class="muted">Short answer: “Because the harvest failed and supplies ran low.”</div>
-              </div>
-              <div class="card" style="margin-top:8px;">
-                <div style="font-weight:600;">Q2</div>
-                <div class="muted">Summary: “The policy aimed to allocate flour fairly, though people feared favoritism.”</div>
-              </div>
+            <div class="card" style="margin-top:8px;">
+              <div style="font-weight:600;">Q2</div>
+              <div class="muted">Summary: “The policy aimed to allocate flour fairly, though people feared favoritism.”</div>
             </div>
           </div>
         </div>
       </div>
-    {/if}
+    </div>
   {/if}
 </div>
