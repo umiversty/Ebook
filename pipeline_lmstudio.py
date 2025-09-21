@@ -2,16 +2,105 @@ import os
 import re
 import json
 import csv
-import pdfplumber
-import spacy
+from dataclasses import dataclass
+from typing import Dict, Iterable, Optional
+
+try:
+    import pdfplumber
+except ImportError:  # pragma: no cover - optional dependency during tests
+    pdfplumber = None
+
+try:
+    import spacy
+except ImportError:  # pragma: no cover - optional dependency during tests
+    spacy = None
+
 from lmstudio import Client  # LM Studio 2025+ SDK
 
 # --------------------------
 # Setup
 # --------------------------
-nlp = spacy.load("en_core_web_sm")
+if spacy is None:  # pragma: no cover - exercised only when spaCy unavailable
+    nlp = None
+else:
+    try:
+        nlp = spacy.load("en_core_web_sm")
+    except Exception:  # pragma: no cover - fallback for missing model at runtime
+        nlp = None
 OUTPUT_IMAGE_DIR = "output_images"
 os.makedirs(OUTPUT_IMAGE_DIR, exist_ok=True)
+
+
+# --------------------------
+# Student profile modelling
+# --------------------------
+DIFFICULTY_BANDS = {
+    "foundational": {"remember", "understand"},
+    "intermediate": {"apply", "analyze"},
+    "advanced": {"evaluate", "create"},
+}
+
+
+@dataclass
+class StudentProfile:
+    accuracy: float
+    average_response_time: float
+    mastery_score: float = 0.5
+    growth_trend: float = 0.0
+
+    @classmethod
+    def from_dict(cls, payload: Dict[str, float]) -> "StudentProfile":
+        return cls(
+            accuracy=float(payload.get("accuracy", 0.6)),
+            average_response_time=float(payload.get("average_response_time", 35.0)),
+            mastery_score=float(payload.get("mastery_score", payload.get("mastery", 0.5))),
+            growth_trend=float(payload.get("growth_trend", payload.get("growth", 0.0))),
+        )
+
+    @classmethod
+    def default(cls) -> "StudentProfile":
+        return cls(accuracy=0.65, average_response_time=35.0)
+
+    def target_difficulty_band(self) -> str:
+        """Return a Bloom difficulty band derived from performance signals."""
+
+        # Normalise metrics to a 0-1 scale and clamp to avoid runaway inputs.
+        accuracy_score = max(0.0, min(1.0, self.accuracy))
+        mastery_score = max(0.0, min(1.0, self.mastery_score))
+        speed_score = 1.0 - max(0.0, min(1.0, self.average_response_time / 60.0))
+        growth_score = max(-1.0, min(1.0, self.growth_trend))
+
+        composite = (
+            0.45 * accuracy_score
+            + 0.25 * mastery_score
+            + 0.2 * speed_score
+            + 0.1 * ((growth_score + 1.0) / 2.0)
+        )
+
+        if composite >= 0.7:
+            return "advanced"
+        if composite >= 0.5:
+            return "intermediate"
+        return "foundational"
+
+
+def load_student_profile(profile_path: Optional[str] = None) -> StudentProfile:
+    """Load a student profile from JSON, falling back to defaults when missing."""
+
+    if profile_path and os.path.exists(profile_path):
+        with open(profile_path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+            return StudentProfile.from_dict(payload)
+
+    env_payload = os.environ.get("STUDENT_PROFILE")
+    if env_payload:
+        try:
+            payload = json.loads(env_payload)
+            return StudentProfile.from_dict(payload)
+        except json.JSONDecodeError:
+            pass
+
+    return StudentProfile.default()
 
 # Initialize LM Studio client
 client = Client()
@@ -24,15 +113,27 @@ def clean_text(text):
     return "\n".join([line.strip() for line in lines if line.strip() and not re.match(r"^Page\s*\d+$", line, re.IGNORECASE)])
 
 def extract_keywords_and_entities(text):
+    if nlp is None:
+        return [], []
+
     doc = nlp(text)
-    entities = list(set([ent.text for ent in doc.ents]))
-    keywords = [token.text for token in doc if token.pos_ in ("NOUN", "PROPN")]
+    entities = list(set(ent.text for ent in getattr(doc, "ents", [])))
+    keywords = [
+        token.text
+        for token in doc
+        if getattr(token, "pos_", None) in ("NOUN", "PROPN")
+    ]
     return list(set(keywords)), entities
 
 # --------------------------
 # PDF Extraction
 # --------------------------
 def extract_pdf_text(pdf_path):
+    if pdfplumber is None:
+        raise ImportError(
+            "pdfplumber is required for PDF extraction but is not installed."
+        )
+
     pages = []
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
@@ -64,6 +165,29 @@ def chunk_and_summarize(pages, max_words=500):
 # --------------------------
 # Question generation
 # --------------------------
+def estimate_bloom_level(question: str) -> str:
+    """Best-effort Bloom level heuristics using indicative verbs."""
+
+    q_lower = question.lower()
+    for keyword, level in (
+        ("define", "remember"),
+        ("list", "remember"),
+        ("describe", "understand"),
+        ("explain", "understand"),
+        ("apply", "apply"),
+        ("demonstrate", "apply"),
+        ("compare", "analyze"),
+        ("analyze", "analyze"),
+        ("evaluate", "evaluate"),
+        ("justify", "evaluate"),
+        ("design", "create"),
+        ("create", "create"),
+    ):
+        if keyword in q_lower:
+            return level
+    return "understand"
+
+
 def generate_questions_local(chunk, model, max_questions=3):
     prompt = f"""
 You are an educational assistant generating questions.
@@ -82,16 +206,43 @@ Instructions:
         temperature=0.7
     )
     questions = re.split(r"\n\d*\.?\s*", response.output_text.strip())
-    return [q.strip() for q in questions if q.strip()]
+    results = []
+    for q in questions:
+        q_clean = q.strip()
+        if not q_clean:
+            continue
+        results.append({
+            "question": q_clean,
+            "bloom_level": estimate_bloom_level(q_clean),
+        })
+    return results
 
-def generate_questions_for_pdf_local(chunks, model, max_questions_per_chunk=3):
+def generate_questions_for_pdf_local(
+    chunks,
+    model,
+    max_questions_per_chunk=3,
+    student_profile: Optional[StudentProfile] = None,
+):
     all_questions=[]
+    profile = student_profile or StudentProfile.default()
+    target_band = profile.target_difficulty_band()
+    desired_levels = DIFFICULTY_BANDS.get(target_band, set())
     for idx, chunk in enumerate(chunks, start=1):
-        q_chunk = generate_questions_local(chunk, model, max_questions=max_questions_per_chunk)
-        for q in q_chunk:
+        q_chunk = generate_questions_local(
+            chunk, model, max_questions=max_questions_per_chunk
+        )
+        filtered: Iterable[Dict[str, str]] = (
+            q for q in q_chunk if q.get("bloom_level") in desired_levels
+        )
+        filtered_list = list(filtered)
+        if not filtered_list:
+            filtered_list = q_chunk
+        for q in filtered_list:
             all_questions.append({
                 "chunk_idx": idx,
-                "question": q,
+                "question": q["question"],
+                "bloom_level": q.get("bloom_level", "understand"),
+                "difficulty_band": target_band,
                 "summary": chunk.get("summary",""),
                 "keywords": chunk.get("keywords",[]),
                 "entities": chunk.get("entities",[])
@@ -108,13 +259,23 @@ def save_questions_json(questions, output_path="pdf_questions.json"):
 
 def save_questions_csv(questions, output_path="pdf_questions.csv"):
     with open(output_path,"w",newline="",encoding="utf-8") as csvfile:
-        fieldnames=["chunk_idx","question","summary","keywords","entities"]
+        fieldnames=[
+            "chunk_idx",
+            "question",
+            "bloom_level",
+            "difficulty_band",
+            "summary",
+            "keywords",
+            "entities",
+        ]
         writer=csv.DictWriter(csvfile,fieldnames=fieldnames)
         writer.writeheader()
         for q in questions:
             writer.writerow({
                 "chunk_idx":q["chunk_idx"],
                 "question":q["question"],
+                "bloom_level":q.get("bloom_level", ""),
+                "difficulty_band":q.get("difficulty_band", ""),
                 "summary":q["summary"],
                 "keywords":"; ".join(q["keywords"]),
                 "entities":"; ".join(q["entities"])
@@ -127,6 +288,14 @@ def save_questions_csv(questions, output_path="pdf_questions.csv"):
 if __name__=="__main__":
     pdf_path="sample.pdf"  # Replace with your PDF
     model_name="mistral-nemo-instruct-2407"
+
+    profile_path = os.environ.get("STUDENT_PROFILE_PATH", "student_profile.json")
+    student_profile = load_student_profile(profile_path)
+    print(
+        "🎯 Loaded student profile → accuracy: "
+        f"{student_profile.accuracy:.2f}, avg response: {student_profile.average_response_time:.1f}s, "
+        f"target band: {student_profile.target_difficulty_band()}"
+    )
 
     print("📄 Extracting PDF content...")
     pages = extract_pdf_text(pdf_path)
@@ -151,7 +320,11 @@ if __name__=="__main__":
         raise AttributeError("LM Studio Client does not provide a recognized model-loading helper.")
 
     print("❓ Generating questions for each chunk...")
-    questions = generate_questions_for_pdf_local(chunks, model=model)
+    questions = generate_questions_for_pdf_local(
+        chunks,
+        model=model,
+        student_profile=student_profile,
+    )
 
     json_output_path = "pdf_questions.json"
     csv_output_path = "pdf_questions.csv"
