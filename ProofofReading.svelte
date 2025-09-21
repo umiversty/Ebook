@@ -396,7 +396,26 @@
   .student-grid.single-column .separator-handle { display: none; }
   .title { font-size: 1.25rem; font-weight: 700; }
   .muted { color: #9aa3b2; }
-  .btn { background: #7c9cff; color:#0b1020; border:none; padding:10px 14px; border-radius:10px; font-weight:700; cursor:pointer; }
+  .btn {
+    background: #7c9cff;
+    color: #0b1020;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    min-height: 44px;
+    min-width: 44px;
+    line-height: 1.2;
+  }
+
+  button.btn,
+  a.btn,
+  .btn[role='button'] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
   .btn.secondary { background: rgba(255,255,255,.08); color: #e6e9ef; }
   .pill { display:inline-block; padding: 2px 8px; border-radius:999px; background: rgba(255,255,255,.06); font-size:12px; }
   .table { width:100%; border-collapse: collapse; }
