@@ -56,3 +56,25 @@ To publish your library to [npm](https://www.npmjs.com):
 ```sh
 npm publish
 ```
+
+## NewQuestionPanel
+
+The `NewQuestionPanel` component renders AI-generated questions as accessible cards with interactive hint and answer reveals. Provide an array of questions where each entry includes an `id`, `stem`, `hint`, `answer`, and `whyThisMatters` message:
+
+```svelte
+<script lang="ts">
+  import NewQuestionPanel from '$lib/questions/NewQuestionPanel.svelte';
+
+  const questions = [
+    {
+      id: 'question-1',
+      stem: 'Why did the council choose rationing?',
+      hint: 'Consider the pressures on merchants and officials.',
+      answer: 'Rationing balanced equity and stability.',
+      whyThisMatters: 'Shows how policy makers reconcile fairness with economics.'
+    }
+  ];
+</script>
+
+<NewQuestionPanel {questions} />
+```
