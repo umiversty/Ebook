@@ -4,6 +4,7 @@
   import type { EpubHeading, EvidenceCapturePayload } from './src/lib/epub/types.js';
   import { applyKeyboardResize, clampColumnPx, fractionToPx, MIN_COLUMN_PX, pxToFraction } from './splitLayout';
   import { onMount } from 'svelte';
+  import QuestionPanel from './src/lib/teacher/QuestionPanel.svelte';
 
 
   // ---------------- Types ----------------
@@ -617,25 +618,7 @@
       </section>
     {/if}
 
-    <!-- Teacher: Evidence Map -->
-    <section class="grid" style="grid-template-columns: repeat(4, 1fr);">
-      <div class="card">
-        <div class="muted">Submissions</div>
-        <div class="title">28<span class="muted">/30</span></div>
-      </div>
-      <div class="card">
-        <div class="muted">Avg dwell</div>
-        <div class="title">14m</div>
-      </div>
-      <div class="card">
-        <div class="muted">Avg completion</div>
-        <div class="title">6.8<span class="muted">/7</span></div>
-      </div>
-      <div class="card">
-        <div class="muted">Flags</div>
-        <div class="title">{rows.filter(r=>r.flags).length} <span class="muted">skim alerts</span></div>
-      </div>
-    </section>
+    <QuestionPanel />
 
     <section class="card" style="margin-top:16px;">
       <div class="title" style="margin-bottom:8px;">Student Evidence Table</div>
