@@ -1,12 +1,16 @@
 <svelte:options runes={false} />
 
 <script lang="ts">
+  import type { ReadingSection, ReadingTextSpan } from '../reading/types';
+
   export interface GeneratedQuestion {
     id: string;
     stem: string;
     hint?: string;
     answer: string;
     whyThisMatters: string;
+    readingSection: ReadingSection;
+    textSpan: ReadingTextSpan;
   }
 
   export let questions: GeneratedQuestion[] = [];
@@ -92,6 +96,37 @@
       </section>
 
       <section
+        class="location-section"
+        aria-labelledby={`${question.id}-location-heading`}
+      >
+        <h3 id={`${question.id}-location-heading`} class="location-heading">
+          Source location
+        </h3>
+        <dl class="location-list">
+          <div class="location-row">
+            <dt class="location-term">Section</dt>
+            <dd class="location-definition">
+              <span class="location-section-title">{question.readingSection.title}</span>
+              <span class="location-chapter">{question.readingSection.chapterTitle}</span>
+            </dd>
+          </div>
+          <div class="location-row">
+            <dt class="location-term">Page</dt>
+            <dd class="location-definition">{question.readingSection.pageLabel}</dd>
+          </div>
+          <div class="location-row">
+            <dt class="location-term">Offsets</dt>
+            <dd class="location-definition">
+              {question.textSpan.startOffset}&ndash;{question.textSpan.endOffset}
+            </dd>
+          </div>
+        </dl>
+        <p class="location-snippet" aria-label="Referenced text">
+          &ldquo;{question.textSpan.text}&rdquo;
+        </p>
+      </section>
+
+      <section
         class="importance-section"
         aria-labelledby={`${question.id}-importance-heading`}
       >
@@ -161,7 +196,8 @@
 
   .answer-panel,
   .hint-panel,
-  .importance-section {
+  .importance-section,
+  .location-section {
     margin-top: 0.75rem;
   }
 
@@ -172,5 +208,56 @@
 
   .importance-body {
     margin: 0;
+  }
+
+  .location-section {
+    border: 1px solid var(--panel-border, #d0d7de);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    background: var(--panel-surface-alt, #f8fafc);
+  }
+
+  .location-heading {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+  }
+
+  .location-list {
+    margin: 0 0 0.75rem 0;
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .location-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.75rem;
+    align-items: baseline;
+    font-size: 0.95rem;
+  }
+
+  .location-term {
+    font-weight: 600;
+  }
+
+  .location-definition {
+    margin: 0;
+  }
+
+  .location-section-title {
+    display: block;
+    font-weight: 600;
+  }
+
+  .location-chapter {
+    display: block;
+    font-size: 0.85rem;
+    color: #475569;
+  }
+
+  .location-snippet {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.4;
   }
 </style>

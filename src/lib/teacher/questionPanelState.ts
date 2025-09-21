@@ -1,5 +1,7 @@
 import { derived, writable, type Readable, type Writable } from 'svelte/store';
 
+import type { ReadingSection, ReadingTextSpan } from '../reading/types';
+
 export type BloomTier = 'Remember' | 'Understand' | 'Apply' | 'Analyze';
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
 export type Question = {
@@ -9,6 +11,8 @@ export type Question = {
   difficulty: Difficulty;
   focus: string;
   responseGuide?: string;
+  readingSection: ReadingSection;
+  textSpan: ReadingTextSpan;
 };
 
 export type QuestionTab = {
@@ -21,6 +25,74 @@ export type QuestionTab = {
 export type BloomFilterValue = 'all' | BloomTier;
 export type DifficultyFilterValue = 'all' | Difficulty;
 
+export const sampleReadingSections: Record<string, ReadingSection> = {
+  background: {
+    id: 'section-background',
+    title: 'Background',
+    chapterTitle: 'Colonial Rationing Case Study',
+    pageLabel: '1'
+  },
+  implementation: {
+    id: 'section-implementation',
+    title: 'Implementation',
+    chapterTitle: 'Implementation',
+    pageLabel: '2'
+  },
+  audits: {
+    id: 'section-audits',
+    title: 'Audits and Oversight',
+    chapterTitle: 'Implementation',
+    pageLabel: '2'
+  },
+  reflections: {
+    id: 'section-reflections',
+    title: 'Reflections',
+    chapterTitle: 'Reflections',
+    pageLabel: '3'
+  },
+  lessons: {
+    id: 'section-lessons',
+    title: 'Lessons for Modern Policy',
+    chapterTitle: 'Reflections',
+    pageLabel: '3'
+  }
+};
+
+const rationingSpan: ReadingTextSpan = {
+  startOffset: 42,
+  endOffset: 214,
+  text:
+    'The colony faced dwindling grain reserves after a failed harvest, prompting councils to debate rationing policy for equitable distribution.'
+};
+
+const couponSpan: ReadingTextSpan = {
+  startOffset: 12,
+  endOffset: 168,
+  text:
+    'Bakers received flour allocations tied to reported demand, and coupons were issued in strict weekly increments to protect rural households.'
+};
+
+const auditSpan: ReadingTextSpan = {
+  startOffset: 64,
+  endOffset: 212,
+  text:
+    'Audits contradicted favoritism claims, documenting rotating inspection teams and recommending clearer public communication regarding ration slips.'
+};
+
+const diarySpan: ReadingTextSpan = {
+  startOffset: 18,
+  endOffset: 176,
+  text:
+    'Diaries reveal mixed reactions—relief that grain would last the winter alongside resentment of travel delays and inconsistent merchant records.'
+};
+
+const trustSpan: ReadingTextSpan = {
+  startOffset: 90,
+  endOffset: 198,
+  text:
+    'The language of official notices emphasized civic duty and mutual sacrifice, hinting that greater transparency could have eased public anxiety.'
+};
+
 export const questionTabs: QuestionTab[] = [
   {
     id: 'mcq',
@@ -32,21 +104,27 @@ export const questionTabs: QuestionTab[] = [
         prompt: 'Why did the colonial council adopt rationing measures for flour and salt?',
         bloom: 'Understand',
         difficulty: 'Easy',
-        focus: 'Cause and effect reasoning'
+        focus: 'Cause and effect reasoning',
+        readingSection: sampleReadingSections.background,
+        textSpan: rationingSpan
       },
       {
         id: 'mcq-2',
         prompt: 'Which evidence best shows how rationing rules tried to protect rural families?',
         bloom: 'Analyze',
         difficulty: 'Hard',
-        focus: 'Evidence evaluation'
+        focus: 'Evidence evaluation',
+        readingSection: sampleReadingSections.implementation,
+        textSpan: couponSpan
       },
       {
         id: 'mcq-3',
         prompt: 'What immediate outcome followed the council decree on ration coupons?',
         bloom: 'Remember',
         difficulty: 'Medium',
-        focus: 'Key detail recall'
+        focus: 'Key detail recall',
+        readingSection: sampleReadingSections.implementation,
+        textSpan: couponSpan
       }
     ]
   },
@@ -61,7 +139,9 @@ export const questionTabs: QuestionTab[] = [
         bloom: 'Analyze',
         difficulty: 'Medium',
         focus: 'Fairness analysis',
-        responseGuide: 'Reference the audit logs and rotating inspection teams.'
+        responseGuide: 'Reference the audit logs and rotating inspection teams.',
+        readingSection: sampleReadingSections.audits,
+        textSpan: auditSpan
       },
       {
         id: 'short-2',
@@ -69,7 +149,9 @@ export const questionTabs: QuestionTab[] = [
         bloom: 'Understand',
         difficulty: 'Easy',
         focus: 'Summarizing evidence',
-        responseGuide: 'Highlight travel delays and inconsistent merchant records.'
+        responseGuide: 'Highlight travel delays and inconsistent merchant records.',
+        readingSection: sampleReadingSections.background,
+        textSpan: diarySpan
       },
       {
         id: 'short-3',
@@ -77,7 +159,9 @@ export const questionTabs: QuestionTab[] = [
         bloom: 'Apply',
         difficulty: 'Hard',
         focus: 'Policy application',
-        responseGuide: 'Suggest transparency steps or community audits.'
+        responseGuide: 'Suggest transparency steps or community audits.',
+        readingSection: sampleReadingSections.reflections,
+        textSpan: trustSpan
       }
     ]
   },
@@ -91,21 +175,27 @@ export const questionTabs: QuestionTab[] = [
         prompt: 'Identify one passage that shows how ration coupons were distributed.',
         bloom: 'Remember',
         difficulty: 'Easy',
-        focus: 'Textual evidence selection'
+        focus: 'Textual evidence selection',
+        readingSection: sampleReadingSections.implementation,
+        textSpan: couponSpan
       },
       {
         id: 'evidence-2',
         prompt: 'Select two quotes that reveal tensions between merchants and inspectors.',
         bloom: 'Analyze',
         difficulty: 'Medium',
-        focus: 'Perspective comparison'
+        focus: 'Perspective comparison',
+        readingSection: sampleReadingSections.audits,
+        textSpan: auditSpan
       },
       {
         id: 'evidence-3',
         prompt: 'Find evidence that supports the claim that audits reduced favoritism.',
         bloom: 'Apply',
         difficulty: 'Hard',
-        focus: 'Claim support with evidence'
+        focus: 'Claim support with evidence',
+        readingSection: sampleReadingSections.audits,
+        textSpan: auditSpan
       }
     ]
   }
