@@ -133,23 +133,30 @@
     align-items: center;
     gap: 0.5rem;
     font-size: 1rem;
-    padding: 0.25rem 0;
+    padding: 0.25rem 0.25rem;
     background: none;
     border: none;
     color: inherit;
     text-align: left;
     cursor: pointer;
-  }
-
-  .hint-toggle:focus-visible {
-    outline: 3px solid var(--focus-ring, #2563eb);
-    outline-offset: 2px;
+    border-radius: 0.75rem;
   }
 
   .answer-toggle {
     margin-top: 1rem;
     font-size: 1rem;
     padding: 0.5rem 0.75rem;
+    border-radius: 0.75rem;
+  }
+
+  .hint-toggle:focus,
+  .answer-toggle:focus {
+    outline: none;
+  }
+
+  .hint-toggle:focus-visible,
+  .answer-toggle:focus-visible {
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.55);
   }
 
   .answer-panel,

@@ -343,6 +343,14 @@
     cursor: pointer;
   }
 
+  .control:focus {
+    outline: none;
+  }
+
+  .control:focus-visible {
+    box-shadow: 0 0 0 4px rgba(195, 212, 255, 0.85);
+  }
+
   .control[disabled] {
     opacity: 0.5;
     cursor: not-allowed;
@@ -372,8 +380,12 @@
 
   .toc-item button:focus {
     outline: none;
-    border-color: #7c9cff;
+  }
+
+  .toc-item button:focus-visible {
+    border-color: rgba(124, 156, 255, 0.75);
     background: rgba(124, 156, 255, 0.2);
+    box-shadow: 0 0 0 4px rgba(124, 156, 255, 0.55);
   }
 
   .toc-item.level-2 { padding-left: 16px; }
@@ -413,8 +425,12 @@
 
   .search-results button:focus {
     outline: none;
-    border-color: #7c9cff;
+  }
+
+  .search-results button:focus-visible {
+    border-color: rgba(124, 156, 255, 0.75);
     background: rgba(124, 156, 255, 0.2);
+    box-shadow: 0 0 0 4px rgba(124, 156, 255, 0.55);
   }
 
   .status-bar {
