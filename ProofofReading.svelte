@@ -1,17 +1,17 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import EpubReader from './src/lib/epub/EpubReader.svelte';
+  import { sampleLandmarks, samplePages, sampleToc } from './src/lib/epub/sampleData';
+  import type { EvidenceCapturePayload, EpubHeading } from './src/lib/epub/types';
 
   // ---------------- Types ----------------
   type Task = { id: string; type: 'highlight' | 'short' | 'vocab'; prompt: string; done?: boolean; answer?: string };
-  type Evidence = { id: string; text: string; start: number; end: number };
+  type Evidence = { id: string; text: string; start: number; end: number; pageId: string };
   type StudentRow = { name: string; time: string; tasks: string; quality: 'Strong' | 'Medium' | 'Weak'; flags?: string; flagsDemo?: boolean };
 
   // --------------- State -----------------
   let screen: 'student' | 'teacher' = 'student';
   let title = 'Colonial Rationing Case Study';
-  let reading = `The colony faced dwindling grain reserves after a failed harvest. Councils debated rationing policy. Merchants argued for price ceilings while officials proposed equitable distribution based on household size. Diaries from the period reveal mixed reactions among townspeople, noting both relief and resentment. Implementation of ration books began the following month. Bakers received flour allocations tied to reported demand. Rumors of favoritism spread, particularly concerning officials and their associates. Audits later contradicted some claims.
-
-Historians point out that rationing systems are often perceived as unfair in the short term but can stabilize markets. The language of official notices emphasized civic duty and mutual sacrifice, while diaries reveal anxiety over scarcity and social standing.`;
 
   let tasks: Task[] = [
     { id: 't1', type: 'highlight', prompt: 'Highlight the sentence where the author explains why rationing was necessary.' },
@@ -20,6 +20,8 @@ Historians point out that rationing systems are often perceived as unfair in the
   ];
 
   let evidence: Evidence[] = [];
+  let currentHeading: EpubHeading | null = samplePages[0]?.headings[0] ?? null;
+  let currentPageId: string | null = samplePages[0]?.id ?? null;
   let dwellMs = 0;
   onMount(() => {
     const interval = setInterval(() => {
@@ -33,30 +35,22 @@ Historians point out that rationing systems are often perceived as unfair in the
 
   function percentDone() { return Math.round((tasks.filter((t) => t.done).length / tasks.length) * 100); }
 
-  function onMouseUpCapture() {
-    const selection = window.getSelection?.();
-    if (!selection || selection.rangeCount === 0) return;
-    const range = selection.getRangeAt(0);
-    const container = document.getElementById('reading')!;
-    if (!container.contains(range.commonAncestorContainer)) return;
-    const text = selection.toString();
-    if (!text || text.trim().length < 3) return;
+  function handleEvidenceCapture(event: CustomEvent<{ payload: EvidenceCapturePayload }>) {
+    const payload = event.detail.payload;
+    evidence = [
+      ...evidence,
+      { id: 'e' + (evidence.length + 1), text: payload.text, start: payload.start, end: payload.end, pageId: payload.pageId }
+    ];
+    const ht = tasks.find((t) => t.type === 'highlight');
+    if (ht) ht.done = true;
+  }
 
-    // Compute offsets (simple mock)
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-    let acc = 0, startGlobal = -1, endGlobal = -1;
-    while (walker.nextNode()) {
-      const node = walker.currentNode as Text;
-      if (node === range.startContainer) startGlobal = acc + range.startOffset;
-      if (node === range.endContainer) { endGlobal = acc + range.endOffset; break; }
-      acc += node.nodeValue?.length || 0;
-    }
-    if (startGlobal >= 0 && endGlobal > startGlobal) {
-      evidence = [...evidence, { id: 'e' + (evidence.length + 1), text, start: startGlobal, end: endGlobal }];
-      const ht = tasks.find((t) => t.type === 'highlight');
-      if (ht) ht.done = true;
-    }
-    selection.removeAllRanges();
+  function handleHeading(event: CustomEvent<{ heading: EpubHeading | null }>) {
+    currentHeading = event.detail.heading ?? null;
+  }
+
+  function handlePageChange(event: CustomEvent<{ pageId: string }>) {
+    currentPageId = event.detail.pageId;
   }
 
   function setAnswer(id: string, val: string) {
@@ -161,25 +155,30 @@ Historians point out that rationing systems are often perceived as unfair in the
         <div class="title" style="margin-bottom:4px;">{title}</div>
         <div class="muted" style="margin-bottom:12px;">Read naturally; complete tasks as you go. Highlights count as evidence.</div>
 
-        <!-- attach the selection handler here (accessible) -->
-        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-        <div
-          id="reading"
-          style="line-height:1.9; white-space:pre-wrap;"
-          on:mouseup|capture={onMouseUpCapture}
-          role="region"
-          aria-label="Reading content"
-        >
-          {reading}
+        <div class="muted" style="margin-bottom:12px;">
+          Current section: {currentHeading?.text ?? '—'}
+          {#if currentPageId}
+            <span class="pill" style="margin-left:8px;">Page {currentPageId}</span>
+          {/if}
         </div>
+
+        <EpubReader
+          pages={samplePages}
+          toc={sampleToc}
+          landmarks={sampleLandmarks}
+          initialPageId={samplePages[0]?.id}
+          on:evidencecapture={handleEvidenceCapture}
+          on:heading={handleHeading}
+          on:pagechange={handlePageChange}
+        />
 
         <div style="margin-top:16px;">
           <div class="muted" style="margin-bottom:6px;">Your evidence</div>
           {#if evidence.length===0}
-            <div class="muted">No highlights yet. Drag to select a sentence.</div>
+            <div class="muted">No highlights yet. Use the EPUB reader to highlight text.</div>
           {:else}
             {#each evidence as ev}
-              <div class="hl">“{ev.text}” <span class="pill">{ev.start}–{ev.end}</span></div>
+              <div class="hl">“{ev.text}” <span class="pill">Pg {ev.pageId}</span> <span class="pill">{ev.start}–{ev.end}</span></div>
             {/each}
           {/if}
         </div>

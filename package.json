@@ -8,7 +8,8 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"prepack": "svelte-kit sync && svelte-package && publint",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"test": "vitest"
 	},
 	"files": [
 		"dist",
@@ -35,13 +36,18 @@
 		"@sveltejs/kit": "^2.22.0",
 		"@sveltejs/package": "^2.0.0",
 		"@sveltejs/vite-plugin-svelte": "^6.0.0",
+		"@testing-library/jest-dom": "^6.5.0",
+		"@testing-library/svelte": "^5.0.0",
+		"@testing-library/user-event": "^14.5.2",
 		"@tsconfig/svelte": "^5.0.5",
 		"@types/node": "^24.5.1",
+		"jsdom": "^27.0.0",
 		"publint": "^0.3.2",
 		"svelte": "^5.0.0",
 		"svelte-check": "^4.3.1",
 		"typescript": "^5.9.2",
-		"vite": "^7.0.4"
+		"vite": "^7.0.4",
+		"vitest": "^2.1.1"
 	},
 	"keywords": [
 		"svelte"
