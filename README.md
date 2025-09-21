@@ -1,57 +1,74 @@
-# Svelte library
+# EBook tooling and question generation
 
-Everything you need to build a Svelte library, powered by [`sv`](https://npmjs.com/package/sv).
+This workspace powers the educator workflow for the EBook reader monorepo. In addition to the Svelte UI packages, it includes a local LM Studio pipeline for generating richly annotated study questions and a durable attempt scheduler for spaced review.
 
-Read more about creating a library [in the docs](https://svelte.dev/docs/kit/packaging).
+## Question generation pipeline
 
-## Creating a project
+`pipeline_lmstudio.py` extracts text from PDFs, chunks the content, and prompts LM Studio for structured questions. Each question persists the following fields:
 
-If you're seeing this, you've probably already done this step. Congrats!
+- `question`: The rendered prompt for learners.
+- `answer`: A concise, model-provided response.
+- `explanation`: Supporting rationale for the answer.
+- `source_span`: Verbatim evidence with `text`, `start`, and `end` offsets.
+
+Questions are saved to both JSON (`pdf_questions.json`) and CSV (`pdf_questions.csv`) with these enriched fields, alongside chunk metadata such as summaries, keywords, and named entities.
+
+## Attempt tracking and scheduling
+
+The `attempt_tracking.AttemptTracker` persists learner outcomes to `attempt_log.json` and computes revisit schedules for incorrect answers. Each failed attempt backs off using a configurable exponential interval (default 15 minutes, 30 minutes, 60 minutes, ...), and queued items are exported through `review_queue.json` for the next study session.
+
+### Usage example
+
+```python
+from attempt_tracking import AttemptTracker
+
+tracker = AttemptTracker()
+tracker.record_attempt("chunk-1-q1", correct=False)
+ready_for_review = tracker.get_items_for_export()
+```
+
+Run the Python test suite to verify the scheduler logic:
 
 ```sh
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
+python -m pytest
 ```
 
 ## Developing
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Install dependencies and start the development server:
 
 ```sh
+npm install
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-Everything inside `src/lib` is part of your library, everything inside `src/routes` can be used as a showcase or preview app.
+Everything inside `src/lib` is part of the library, and `src/routes` can be used as a showcase or preview app.
 
 ## Building
 
-To build your library:
+To build the library:
 
 ```sh
 npm pack
 ```
 
-To create a production version of your showcase app:
+To create a production version of the showcase app:
 
 ```sh
 npm run build
 ```
 
-You can preview the production build with `npm run preview`.
+Preview the production build with:
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+```sh
+npm run preview
+```
+
+> To deploy the app, you may need to install an adapter for your target environment.
 
 ## Publishing
 
-Go into the `package.json` and give your package the desired name through the `"name"` option. Also consider adding a `"license"` field and point it to a `LICENSE` file which you can create from a template (one popular option is the [MIT license](https://opensource.org/license/mit/)).
-
-To publish your library to [npm](https://www.npmjs.com):
+Update the `name` field in `package.json`, add licensing information, and publish to npm:
 
 ```sh
 npm publish
