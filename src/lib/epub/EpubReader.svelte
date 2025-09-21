@@ -325,6 +325,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    --epub-reader-sticky-offset: clamp(96px, 18vh, 144px);
   }
 
   .controls {
@@ -430,10 +431,15 @@
     min-height: 320px;
     line-height: 1.8;
     outline: none;
+    scroll-padding-top: var(--epub-reader-sticky-offset);
   }
 
   .viewer:focus-visible {
     box-shadow: 0 0 0 3px rgba(124, 156, 255, 0.6);
+  }
+
+  .viewer :is([data-epub-heading], [data-epub-landmark], [data-epub-anchor], [id]) {
+    scroll-margin-top: var(--epub-reader-sticky-offset);
   }
 
   .landmarks {
