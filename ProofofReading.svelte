@@ -359,7 +359,10 @@
 
   function applyContainerMetrics(width: number) {
     containerWidth = width;
-    isSingleColumn = width < BREAKPOINT || width <= MIN_PX * 2;
+    const windowWidth = typeof window !== 'undefined' ? window.innerWidth : width;
+    const viewportSource = Number.isFinite(viewportWidth) ? viewportWidth : windowWidth;
+    const stableViewportWidth = Math.min(viewportSource, windowWidth);
+    isSingleColumn = stableViewportWidth < BREAKPOINT || width <= MIN_PX * 2;
   }
 
   function setLeftByPx(px: number, width = containerWidth) {

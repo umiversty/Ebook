@@ -113,4 +113,32 @@ describe('Proof-of-Reading header integrations', () => {
     const status = screen.getByText(/Current section:/i);
     expect(status.textContent).toContain('Audits and Oversight');
   });
+
+  test('stays in single column when resize observer jitters around the breakpoint', async () => {
+    setViewportWidth(700);
+    const { component } = render(ProofofReading);
+
+    await tick();
+    await tick();
+
+    const grid = await screen.findByTestId('student-grid');
+    const getState = () => ((component as { $capture_state?: () => { isSingleColumn?: boolean } }).$capture_state?.() ?? {});
+
+    const applyMetrics = getState().applyContainerMetrics as ((width: number) => void) | undefined;
+    if (!applyMetrics) {
+      throw new Error('Expected applyContainerMetrics to be captured in state');
+    }
+
+    applyMetrics(600);
+    await tick();
+    expect(getState().isSingleColumn).toBe(true);
+
+    applyMetrics(719);
+    await tick();
+    expect(getState().isSingleColumn).toBe(true);
+
+    applyMetrics(721);
+    await tick();
+    expect(getState().isSingleColumn).toBe(true);
+  });
 });
