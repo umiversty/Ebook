@@ -1,33 +1,3 @@
-<<<<<<< HEAD
-// src/lib/epub/__tests__/ProofofReading.header.test.ts
-import { render, screen } from '@testing-library/svelte';
-import { vi } from 'vitest';
-import ProofofReading from '../../../ProofofReading.svelte';
-
-// Mock window.innerWidth so responsive breadcrumb works
-function setViewport(width: number) {
-  vi.stubGlobal('window', {
-    innerWidth: width,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    matchMedia: () => ({
-      matches: false,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn()
-    })
-  });
-}
-
-describe('Proof-of-Reading header integrations', () => {
-  it('renders breadcrumb trail with accessible current section', async () => {
-    setViewport(1200);
-    render(ProofofReading);
-
-    const nav = await screen.findByRole('navigation', {
-      name: /course navigation/i
-=======
 import { cleanup, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
@@ -37,10 +7,12 @@ import type { ReadingSection } from '../../reader/readingSection.js';
 import { setViewportWidth as setViewportWidthStore } from '../../reader/viewportStore.js';
 
 const DEFAULT_VIEWPORT = 1024;
+
 const setViewportWidth = (width: number) => {
   Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: width });
   setViewportWidthStore(width);
 };
+
 const originalMatchMedia = window.matchMedia;
 
 describe('Proof-of-Reading header integrations', () => {
@@ -64,16 +36,31 @@ describe('Proof-of-Reading header integrations', () => {
           dispatchEvent: vi.fn()
         };
       })
->>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    setViewportWidthStore(DEFAULT_VIEWPORT);
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: originalMatchMedia
+    });
+    vi.restoreAllMocks();
+  });
+
+  test('renders breadcrumb trail with accessible current section', async () => {
+    render(ProofofReading);
+
+    const nav = await screen.findByRole('navigation', {
+      name: /course navigation/i
     });
     expect(nav).toBeInTheDocument();
-
-    // Current page breadcrumb should have aria-current="page"
     expect(nav.querySelector('[aria-current="page"]')).toBeTruthy();
   });
 
-  it('exposes progress ring status text for assistive tech', async () => {
-    setViewport(1200);
+  test('exposes progress ring status text for assistive tech', async () => {
     render(ProofofReading);
 
     const ring = await screen.findByRole('img', {
@@ -82,17 +69,6 @@ describe('Proof-of-Reading header integrations', () => {
     expect(ring).toBeInTheDocument();
   });
 
-  it('collapses breadcrumb trail when the viewport is narrow', async () => {
-    setViewport(500);
-    render(ProofofReading);
-
-<<<<<<< HEAD
-    // Expect the overflow "…" button to appear for hidden breadcrumbs
-    const overflowBtn = await screen.findByRole('button', {
-      name: /previous levels:/i
-    });
-    expect(overflowBtn).toBeInTheDocument();
-=======
   test('collapses breadcrumb trail when the viewport is narrow', async () => {
     render(ProofofReading);
     let nav = screen.getByRole('navigation', { name: /course navigation/i });
@@ -113,7 +89,6 @@ describe('Proof-of-Reading header integrations', () => {
 
     const overflowButton = screen.getByRole('button', { name: /previous levels/i });
     expect(overflowButton).toBeInstanceOf(HTMLButtonElement);
->>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a
   });
 
   test('updates breadcrumb when the reader emits a new section', async () => {

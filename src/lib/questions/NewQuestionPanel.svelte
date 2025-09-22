@@ -1,175 +1,171 @@
 <script lang="ts">
-  // A single question card panel
+  export type QuestionLocation = {
+    section: string;
+    page: number | string;
+    offsets: [number, number];
+    snippet: string;
+  };
 
-  export let q: {
+  export type GeneratedQuestion = {
     id: string;
     stem: string;
     hint?: string;
     answer?: string;
-    location?: {
-      section?: string;
-      page?: number;
-      offsets?: [number, number];
-      snippet?: string;
-    };
+    location: QuestionLocation;
   };
 
-  // Whether this panel’s accordion is expanded
-  export let expanded: boolean = false;
-
-<<<<<<< HEAD
-  // Callback provided by parent to toggle accordion state
+  export let q: GeneratedQuestion;
+  export let expanded = false;
   export let toggleHint: (id: string) => void = () => {};
-=======
-  const toggleAnswer = (id: string) => {
-    openAnswers = toggleSet(openAnswers, id);
-  };
 
-  const handleToggleKeydown = (
-    event: KeyboardEvent,
-    id: string,
-    toggle: (itemId: string) => void
-  ) => {
+  const hintButtonId = `${q.id}-hint-toggle`;
+  const hintPanelId = `${q.id}-hint-panel`;
+
+  function announceToggle(event: Event) {
+    event.preventDefault();
+    toggleHint(q.id);
+  }
+
+  function handleToggleKeydown(event: KeyboardEvent) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      toggle(id);
+      toggleHint(q.id);
     }
-  };
->>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a
+  }
 </script>
 
-<article class="question-card" aria-labelledby={`question-${q.id}-stem`}>
+<article class="question" aria-labelledby={`${q.id}-stem`}>
   <header class="question-header">
-    <h2 class="question-stem" id={`question-${q.id}-stem`}>
-      {q.stem}
-    </h2>
+    <h3 id={`${q.id}-stem`} class="question-stem">{q.stem}</h3>
+    <button
+      type="button"
+      class="hint-toggle"
+      id={hintButtonId}
+      aria-controls={hintPanelId}
+      aria-expanded={expanded ? 'true' : 'false'}
+      on:click={announceToggle}
+      on:keydown={handleToggleKeydown}
+    >
+      {expanded ? 'Hide hint' : 'Show hint'}
+    </button>
   </header>
 
-<<<<<<< HEAD
-  {#if q.hint}
-    <section class="hint-section">
-      <h3 class="hint-heading" id={`question-${q.id}-hint-heading`}>
-=======
-      {#if question.hint?.trim()}
-        <section class="hint-section">
-          <h3 id={`${question.id}-hint-heading`} class="hint-heading">
-            <button
-              type="button"
-              class="hint-toggle"
-              aria-expanded={openHints.has(question.id)}
-              aria-controls={`${question.id}-hint-panel`}
-              on:click={() => toggleHint(question.id)}
-              on:keydown={(event) => handleToggleKeydown(event, question.id, toggleHint)}
-            >
-              {openHints.has(question.id) ? 'Hide hint' : 'Show hint'}
-            </button>
-          </h3>
+  <section
+    id={hintPanelId}
+    class="hint"
+    role="region"
+    aria-labelledby={hintButtonId}
+    hidden={!expanded}
+  >
+    <p>{q.hint ?? 'No hint available.'}</p>
+  </section>
 
-          {#if openHints.has(question.id)}
-            <div
-              id={`${question.id}-hint-panel`}
-              role="region"
-              aria-labelledby={`${question.id}-hint-heading`}
-              class="hint-panel"
-            >
-              <p>{question.hint}</p>
-            </div>
-          {/if}
-        </section>
-      {/if}
-
-      <section class="answer-section">
->>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a
-        <button
-          type="button"
-<<<<<<< HEAD
-          class="hint-toggle"
-          aria-controls={`hint-${q.id}`}
-          aria-expanded={expanded}
-          on:click={() => toggleHint(q.id)}
-=======
-          class="answer-toggle"
-          aria-expanded={openAnswers.has(question.id)}
-          aria-controls={`${question.id}-answer-panel`}
-          on:click={() => toggleAnswer(question.id)}
-          on:keydown={(event) => handleToggleKeydown(event, question.id, toggleAnswer)}
->>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a
-        >
-          {expanded ? 'Hide hint' : 'Show hint'}
-        </button>
-      </h3>
-
-      <div
-        id={`hint-${q.id}`}
-        hidden={!expanded}
-        aria-labelledby={`question-${q.id}-hint-heading`}
-      >
-        {q.hint}
+  <section class="location" aria-label="Source location">
+    <h4 class="location-heading">{q.location.section}</h4>
+    <dl class="location-details">
+      <div>
+        <dt>Page</dt>
+        <dd>Page {q.location.page}</dd>
       </div>
-    </section>
-  {/if}
-
-  {#if q.answer}
-    <section class="answer-section">
-      <button
-        type="button"
-        class="answer-toggle"
-        aria-controls={`answer-${q.id}`}
-        aria-expanded="false"
-      >
-        Show answer
-      </button>
-      <div id={`answer-${q.id}`} hidden>
-        {q.answer}
+      <div>
+        <dt>Offsets</dt>
+        <dd>{q.location.offsets[0]}–{q.location.offsets[1]}</dd>
       </div>
-    </section>
-  {/if}
-
-  {#if q.location}
-    <section class="location-section" aria-labelledby={`question-${q.id}-location-heading`}>
-      <h3 class="location-heading" id={`question-${q.id}-location-heading`}>
-        Source location
-      </h3>
-      <dl class="location-list">
-        {#if q.location.section}
-          <div class="location-row">
-            <dt>Section</dt>
-            <dd><span class="location-section-title">{q.location.section}</span></dd>
-          </div>
-        {/if}
-        {#if q.location.page}
-          <div class="location-row">
-            <dt>Page</dt>
-            <dd>{q.location.page}</dd>
-          </div>
-        {/if}
-        {#if q.location.offsets}
-          <div class="location-row">
-            <dt>Offsets</dt>
-            <dd>{q.location.offsets[0]} – {q.location.offsets[1]}</dd>
-          </div>
-        {/if}
-      </dl>
-
-      {#if q.location.snippet}
-        <p class="location-snippet" aria-label="Referenced text">
-          “{q.location.snippet}”
-        </p>
-      {/if}
-    </section>
-  {/if}
+    </dl>
+    <p class="location-snippet">{q.location.snippet}</p>
+  </section>
 </article>
 
 <style>
-  .question-card { background:#0f1428; padding:16px; border-radius:12px; margin-bottom:12px; }
-  .question-stem { font-size:1.1rem; font-weight:600; }
-  .hint-toggle, .answer-toggle {
-    background:none; border:none; color:#7c9cff;
-    cursor:pointer; font-weight:600;
+  .question {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-radius: 16px;
+    background: rgba(12, 18, 36, 0.75);
+    color: #f5f7ff;
   }
-  .hint-heading, .location-heading { font-size:1rem; margin-top:12px; }
-  .location-list { margin:0; padding:0; }
-  .location-row { display:flex; gap:8px; }
-  .location-term { font-weight:600; }
-  .location-snippet { font-style:italic; margin-top:6px; }
+
+  .question-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .question-stem {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+
+  .hint-toggle {
+    border: none;
+    border-radius: 999px;
+    padding: 0.5rem 1rem;
+    background: rgba(124, 156, 255, 0.25);
+    color: inherit;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .hint-toggle:focus-visible {
+    outline: 3px solid rgba(124, 156, 255, 0.6);
+    outline-offset: 2px;
+  }
+
+  .hint[hidden] {
+    display: none;
+  }
+
+  .hint {
+    margin: 0;
+    padding: 1rem;
+    border-radius: 12px;
+    background: rgba(124, 156, 255, 0.12);
+  }
+
+  .location {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .location-heading {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .location-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.5rem;
+    margin: 0;
+  }
+
+  .location-details div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  dt {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(245, 247, 255, 0.6);
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 500;
+  }
+
+  .location-snippet {
+    margin: 0;
+    font-style: italic;
+    color: rgba(245, 247, 255, 0.85);
+  }
 </style>

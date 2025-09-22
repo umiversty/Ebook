@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { afterUpdate, onDestroy, onMount, tick } from 'svelte';
+
   import EpubReader from './src/lib/epub/EpubReader.svelte';
   import { sampleLandmarks, samplePages, sampleToc } from './src/lib/epub/sampleData.js';
   import type { EvidenceCapturePayload } from './src/lib/epub/types.js';
@@ -54,6 +56,11 @@
     viewportWidth = value;
   });
 
+  let gridObserver: ResizeObserver | null = null;
+  let observedStudentGrid: HTMLDivElement | null = null;
+  let motionQuery: MediaQueryList | null = null;
+  let motionQueryListener: (() => void) | null = null;
+
   // -------- Breadcrumbs --------
   type BreadcrumbNode = { id: string; label: string; href: string; isCurrent?: boolean };
   const COURSE_BREADCRUMB: BreadcrumbNode = { id: 'course', label: 'AP U.S. History', href: '#course' };
@@ -64,14 +71,48 @@
   const PROGRESS_RING_CIRCUMFERENCE = 2 * Math.PI * PROGRESS_RING_RADIUS;
   const BREADCRUMB_SEPARATOR = ' › ';
 
-<<<<<<< HEAD
-=======
   function syncViewportWidth() {
     if (typeof window === 'undefined') return;
     const width = window.innerWidth;
     if (width !== viewportWidth) {
       updateViewportStore(width);
     }
+  }
+
+  function handleViewportResize() {
+    syncViewportWidth();
+    measureStudentGrid();
+  }
+
+  function measureStudentGrid() {
+    if (!studentGridEl) return;
+    const { width } = studentGridEl.getBoundingClientRect();
+    applyContainerMetrics(width);
+  }
+
+  function setupGridObserver() {
+    if (!studentGridEl) {
+      if (gridObserver) {
+        gridObserver.disconnect();
+        gridObserver = null;
+      }
+      observedStudentGrid = null;
+      return;
+    }
+    if (observedStudentGrid === studentGridEl) return;
+    if (gridObserver) {
+      gridObserver.disconnect();
+    }
+    observedStudentGrid = studentGridEl;
+    if (typeof ResizeObserver !== 'function') {
+      return;
+    }
+    gridObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        applyContainerMetrics(entry.contentRect.width);
+      }
+    });
+    gridObserver.observe(studentGridEl);
   }
 
   function isMobileWidth(width: number): boolean {
@@ -95,7 +136,7 @@
     }
     return section.title;
   }
->>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a
+
   let chapterBreadcrumb: BreadcrumbNode = { id: 'chapter', label: title, href: '#chapter' };
   let sectionBreadcrumb: BreadcrumbNode = {
     id: 'section',
@@ -130,26 +171,6 @@
   let skimThresh = { minDwellMs: 8000, minInteractions: 1, graceRatio: 0.3 };
 
   // ---------------- Functions ----------------
-  function syncViewportWidth() {
-    if (typeof window === 'undefined') return;
-    viewportWidth = window.innerWidth;
-  }
-
-  function resolveSectionLabel(heading: EpubHeading | null, chapterTitle: string): string {
-    if (!heading) return 'Section overview';
-    if (heading.text.trim() === chapterTitle.trim()) return 'Overview';
-    return heading.text;
-  }
-
-  afterUpdate(() => {
-    if (typeof window === 'undefined') return;
-    syncViewportWidth();
-  });
-
-  onDestroy(() => {
-    unsubscribeViewport();
-  });
-
   function percentDone() {
     if (tasks.length === 0) return 0;
     return Math.round((tasks.filter((t) => t.done).length / tasks.length) * 100);
@@ -180,13 +201,6 @@
     );
   }
 
-<<<<<<< HEAD
-  function handleInput(e: Event, id: string) {
-    const target = e.target as HTMLTextAreaElement;
-    setAnswer(id, target.value);
-  }
-
-=======
   function handleTaskInput(id: string, event: Event) {
     const target = event.target as HTMLTextAreaElement | null;
     setAnswer(id, target?.value ?? '');
@@ -290,60 +304,15 @@
     }
   }
 
-  $: if (isSingleColumn) {
-    cancelDragFrame();
-    if (separatorEl && activePointerId !== null && separatorEl.hasPointerCapture(activePointerId)) {
-      separatorEl.releasePointerCapture(activePointerId);
-    }
-    activePointerId = null;
-    isDragging = false;
+  afterUpdate(() => {
+    if (typeof window === 'undefined') return;
+    setupGridObserver();
+    measureStudentGrid();
+  });
+  function onStudentTrigger(row: StudentRow, target: EventTarget | null) {
+    openStudent(row, target instanceof HTMLElement ? target : null);
   }
 
-  $: totalRatio = leftWidth + rightWidth || 1;
-  $: normalizedLeft = totalRatio === 0 ? 0.5 : leftWidth / totalRatio;
-  $: normalizedRight = totalRatio === 0 ? 0.5 : rightWidth / totalRatio;
-  $: gridTemplate = isSingleColumn
-    ? 'minmax(0, 1fr)'
-    : `minmax(${MIN_PX}px, ${normalizedLeft}fr) minmax(${MIN_PX}px, ${normalizedRight}fr)`;
-  $: effectiveWidth = containerWidth > 0 ? containerWidth : MIN_PX * 2;
-  $: currentLeftPx = fractionToPx(normalizedLeft, effectiveWidth);
-  $: ariaValueNow = Math.round(clampColumnPx(currentLeftPx, effectiveWidth));
-  $: ariaValueMax = effectiveWidth > MIN_PX * 2 ? Math.round(effectiveWidth - MIN_PX) : MIN_PX;
-  $: handlePosition = `${normalizedLeft * 100}%`;
-  $: progressPercent = percentDone();
-  $: progressDashOffset = PROGRESS_RING_CIRCUMFERENCE - (progressPercent / 100) * PROGRESS_RING_CIRCUMFERENCE;
-  $: chapterBreadcrumb = { id: 'chapter', label: title, href: '#chapter' };
-  $: sectionBreadcrumb = {
-    id: 'section',
-    label: resolveSectionLabel(currentSection, title),
-    href: '#section',
-    isCurrent: true
-  };
-  $: breadcrumbTrail = [COURSE_BREADCRUMB, UNIT_BREADCRUMB, chapterBreadcrumb, sectionBreadcrumb];
-  $: isMobileBreadcrumb = isMobileWidth(viewportWidth);
-  $: visibleBreadcrumbTrail = isMobileBreadcrumb && breadcrumbTrail.length > 2
-    ? breadcrumbTrail.slice(-2)
-    : breadcrumbTrail;
-  $: hiddenBreadcrumbTrail = isMobileBreadcrumb && breadcrumbTrail.length > visibleBreadcrumbTrail.length
-    ? breadcrumbTrail.slice(0, breadcrumbTrail.length - visibleBreadcrumbTrail.length)
-    : [];
-  $: breadcrumbAriaLabel = `Course navigation: ${breadcrumbTrail.map((crumb) => crumb.label).join(BREADCRUMB_SEPARATOR)}`;
-  $: hiddenBreadcrumbLabel = hiddenBreadcrumbTrail.map((crumb) => crumb.label).join(BREADCRUMB_SEPARATOR);
-
-  // ---------- Teacher data ----------
-  let rows: StudentRow[] = [
-    { name: 'Alice W.', time: '15m', tasks: '7/7', quality: 'Strong' },
-    { name: 'Ben R.', time: '9m', tasks: '5/7', quality: 'Weak' },
-    { name: 'Chris T.', time: '14m', tasks: '6/7', quality: 'Medium' }
-  ];
-  let selected: StudentRow | null = null;
-  let dialogTriggerEl: HTMLElement | null = null;
-  let closeButtonEl: HTMLButtonElement | null = null;
-  let dialogContainerEl: HTMLDivElement | null = null;
-  let pageContentEl: HTMLDivElement | null = null;
-  const dialogTitleId = 'student-drilldown-title';
-
->>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a
   function openStudent(row: StudentRow, trigger: HTMLElement | null = null) {
     dialogTriggerEl = trigger;
     selected = row;
@@ -389,24 +358,108 @@
 
   // ---------------- Lifecycle ----------------
   onMount(() => {
-    const interval = setInterval(() => { dwellMs += 1000; }, 1000);
-    syncViewportWidth();
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      dwellMs += 1000;
+    }, 1000);
+
+    handleViewportResize();
+    const handleResize = () => handleViewportResize();
+    window.addEventListener('resize', handleResize);
+
+    if (typeof window.matchMedia === 'function') {
+      try {
+        motionQuery = window.matchMedia(PREFERS_REDUCED_MOTION_QUERY);
+        prefersReducedMotion = motionQuery.matches;
+        motionQueryListener = () => {
+          prefersReducedMotion = motionQuery?.matches ?? false;
+        };
+        if (typeof motionQuery.addEventListener === 'function') {
+          motionQuery.addEventListener('change', motionQueryListener);
+        } else if (typeof motionQuery.addListener === 'function') {
+          motionQuery.addListener(motionQueryListener);
+        }
+      } catch {
+        motionQuery = null;
+        motionQueryListener = null;
+      }
+    }
+
+    void tick().then(() => {
+      setupGridObserver();
+      measureStudentGrid();
+    });
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('resize', handleResize);
+      if (motionQuery && motionQueryListener) {
+        if (typeof motionQuery.removeEventListener === 'function') {
+          motionQuery.removeEventListener('change', motionQueryListener);
+        } else if (typeof motionQuery.removeListener === 'function') {
+          motionQuery.removeListener(motionQueryListener);
+        }
+      }
+    };
+  });
+
+  onDestroy(() => {
+    unsubscribeViewport();
+    cancelDragFrame();
+    if (separatorEl && activePointerId !== null && separatorEl.hasPointerCapture(activePointerId)) {
+      separatorEl.releasePointerCapture(activePointerId);
+    }
+    activePointerId = null;
+    isDragging = false;
+    if (gridObserver) {
+      gridObserver.disconnect();
+      gridObserver = null;
+    }
+    observedStudentGrid = null;
+    motionQuery = null;
+    motionQueryListener = null;
   });
 
   // ---------------- Reactive ----------------
+  $: if (isSingleColumn) {
+    cancelDragFrame();
+    if (separatorEl && activePointerId !== null && separatorEl.hasPointerCapture(activePointerId)) {
+      separatorEl.releasePointerCapture(activePointerId);
+    }
+    activePointerId = null;
+    isDragging = false;
+  }
+
+  $: totalRatio = leftWidth + rightWidth || 1;
+  $: normalizedLeft = totalRatio === 0 ? 0.5 : leftWidth / totalRatio;
+  $: normalizedRight = totalRatio === 0 ? 0.5 : rightWidth / totalRatio;
+  $: gridTemplate = isSingleColumn
+    ? 'minmax(0, 1fr)'
+    : `minmax(${MIN_PX}px, ${normalizedLeft}fr) minmax(${MIN_PX}px, ${normalizedRight}fr)`;
+  $: effectiveWidth = containerWidth > 0 ? containerWidth : MIN_PX * 2;
+  $: currentLeftPx = fractionToPx(normalizedLeft, effectiveWidth);
+  $: ariaValueNow = Math.round(clampColumnPx(currentLeftPx, effectiveWidth));
+  $: ariaValueMax = effectiveWidth > MIN_PX * 2 ? Math.round(effectiveWidth - MIN_PX) : MIN_PX;
+  $: handlePosition = `${normalizedLeft * 100}%`;
+
   $: progressPercent = percentDone();
   $: progressDashOffset = PROGRESS_RING_CIRCUMFERENCE - (progressPercent / 100) * PROGRESS_RING_CIRCUMFERENCE;
   $: chapterBreadcrumb = { id: 'chapter', label: title, href: '#chapter' };
-  $: sectionBreadcrumb = { id: 'section', label: resolveSectionLabel(currentHeading, title), href: '#section', isCurrent: true };
+  $: sectionBreadcrumb = {
+    id: 'section',
+    label: resolveSectionLabel(currentSection, title),
+    href: '#section',
+    isCurrent: true
+  };
   $: breadcrumbTrail = [COURSE_BREADCRUMB, UNIT_BREADCRUMB, chapterBreadcrumb, sectionBreadcrumb];
-  $: isMobileBreadcrumb = viewportWidth < BREAKPOINT;
-  $: visibleBreadcrumbTrail = isMobileBreadcrumb && breadcrumbTrail.length > 2 ? breadcrumbTrail.slice(-2) : breadcrumbTrail;
+  $: isMobileBreadcrumb = isMobileWidth(viewportWidth);
+  $: visibleBreadcrumbTrail = isMobileBreadcrumb && breadcrumbTrail.length > 2
+    ? breadcrumbTrail.slice(-2)
+    : breadcrumbTrail;
   $: hiddenBreadcrumbTrail = isMobileBreadcrumb && breadcrumbTrail.length > visibleBreadcrumbTrail.length
     ? breadcrumbTrail.slice(0, breadcrumbTrail.length - visibleBreadcrumbTrail.length)
     : [];
-  $: breadcrumbAriaLabel = `Course navigation: ${breadcrumbTrail.map((c) => c.label).join(BREADCRUMB_SEPARATOR)}`;
-  $: hiddenBreadcrumbLabel = hiddenBreadcrumbTrail.map((c) => c.label).join(BREADCRUMB_SEPARATOR);
+  $: breadcrumbAriaLabel = `Course navigation: ${breadcrumbTrail.map((crumb) => crumb.label).join(BREADCRUMB_SEPARATOR)}`;
+  $: hiddenBreadcrumbLabel = hiddenBreadcrumbTrail.map((crumb) => crumb.label).join(BREADCRUMB_SEPARATOR);
 
   // -------- DEMO flags auto-seed/clear --------
   $: if (featureFlags.premium && skimEnabled) {
@@ -430,9 +483,6 @@
   }
 </script>
 
-<<<<<<< HEAD
-<!-- keep your existing <style> and <div class="wrap"> markup structure -->
-=======
 <style>
   /* Use :global for truly global selectors inside a component */
   :global(body) { background: #0b1020; color: #e6e9ef; margin: 0; }
@@ -635,6 +685,7 @@
       </main>
 
       {#if !isSingleColumn}
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <div
           class="separator-handle"
           bind:this={separatorEl}
@@ -745,7 +796,7 @@
                 <button
                   class="btn secondary"
                   type="button"
-                  on:click={(event) => openStudent(r, event.currentTarget as HTMLElement)}
+                  on:click={(event) => onStudentTrigger(r, event.currentTarget)}
                 >
                   View
                 </button>
@@ -777,6 +828,7 @@
     >
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="card modal" bind:this={dialogContainerEl} on:click|stopPropagation>
         <div style="display:flex;align-items:center;justify-content:space-between; margin-bottom:8px;">
           <div class="title" id={dialogTitleId}>{selected.name} — Evidence Drilldown</div>
@@ -806,4 +858,3 @@
     </div>
   {/if}
 </div>
->>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a

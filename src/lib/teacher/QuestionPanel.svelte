@@ -1,139 +1,99 @@
 <script lang="ts">
-  export let chips: { text: string; ariaLabel: string; value: string }[] = [];
-  export let onBloomChipClick: (value: string, target: HTMLElement) => void = () => {};
+  export type QuestionChip = { text: string; ariaLabel: string; value: string };
+
+  export let title = 'Question Library';
+  export let description = 'Filter generated questions by Bloom tier or difficulty.';
+  export let chips: QuestionChip[] = [];
+  export let onBloomChipClick: (value: string, target: HTMLElement | null) => void = () => {};
 
   function handleChipClick(event: Event, value: string) {
-    const target = event.currentTarget as HTMLButtonElement;
-    onBloomChipClick(value, target);
-  }
-
-  function handleBloomChipEvent(value: BloomChipValue, event: Event) {
-    onBloomChipClick(value, event.currentTarget as HTMLButtonElement | null);
-  }
-
-  function handleDifficultyChipEvent(value: DifficultyChipValue, event: Event) {
-    onDifficultyChipClick(value, event.currentTarget as HTMLButtonElement | null);
+    const target = event.currentTarget;
+    onBloomChipClick(value, target instanceof HTMLElement ? target : null);
   }
 </script>
 
-<div class="chip-panel">
-  {#each chips as chip}
-    <button
-      aria-label={chip.ariaLabel}
-      on:click={(e) => handleChipClick(e, chip.value)}
-    >
-<<<<<<< HEAD
-      {chip.text}
-    </button>
-=======
-      {#if $selectedTabId === tab.id}
-        <p class="tab-description">{tab.description}</p>
+<section class="question-panel" aria-label={title}>
+  <header class="panel-header">
+    <h2 class="panel-title">{title}</h2>
+    <p class="panel-description">{description}</p>
+  </header>
 
-        <div class="filters">
-          <div class="filter-group">
-            <span class="filter-label">Bloom tier</span>
-            <div class="chip-row">
-              {#each bloomChips as chip}
-                <button
-                  type="button"
-                  class="chip"
-                  class:active={$bloomFilter === chip.value}
-                  aria-pressed={$bloomFilter === chip.value}
-                  aria-label={chip.ariaLabel}
-                  on:click={(event) => handleBloomChipEvent(chip.value, event)}
-                >
-                  {chip.text}
-                </button>
-              {/each}
-            </div>
-          </div>
-          <div class="filter-group">
-            <span class="filter-label">Difficulty</span>
-            <div class="chip-row">
-              {#each difficultyChips as chip}
-                <button
-                  type="button"
-                  class="chip"
-                  class:active={$difficultyFilter === chip.value}
-                  aria-pressed={$difficultyFilter === chip.value}
-                  aria-label={chip.ariaLabel}
-                  on:click={(event) => handleDifficultyChipEvent(chip.value, event)}
-                >
-                  {chip.text}
-                </button>
-              {/each}
-            </div>
-          </div>
-        </div>
-
-        <ul class="question-list" aria-label={`${tab.label} questions`} aria-live="polite">
-          {#if $filteredQuestions.length > 0}
-            {#each $filteredQuestions as question (question.id)}
-              <li class="question-item">
-                <h3 class="question-title">{question.prompt}</h3>
-                <div class="question-meta">
-                  <span class="chip meta" aria-label={`Bloom tier ${question.bloom}`}>{question.bloom}</span>
-                  <span class="chip meta" aria-label={`Difficulty ${question.difficulty}`}>
-                    {question.difficulty}
-                  </span>
-                  <span class="meta-label">{question.focus}</span>
-                  {#if question.responseGuide}
-                    <span class="meta-label">Guide: {question.responseGuide}</span>
-                  {/if}
-                </div>
-                <section
-                  class="question-location"
-                  aria-labelledby={`${question.id}-location-heading`}
-                >
-                  <h4 id={`${question.id}-location-heading`} class="location-heading">
-                    Source location
-                  </h4>
-                  <dl class="location-list">
-                    <div class="location-row">
-                      <dt class="location-term">Section</dt>
-                      <dd class="location-definition">
-                        <span class="location-section">{question.readingSection.title}</span>
-                        <span class="location-chapter">{question.readingSection.chapterTitle}</span>
-                      </dd>
-                    </div>
-                    <div class="location-row">
-                      <dt class="location-term">Page</dt>
-                      <dd class="location-definition">{question.readingSection.pageLabel}</dd>
-                    </div>
-                    <div class="location-row">
-                      <dt class="location-term">Offsets</dt>
-                      <dd class="location-definition">
-                        {question.textSpan.startOffset}&ndash;{question.textSpan.endOffset}
-                      </dd>
-                    </div>
-                  </dl>
-                  <p class="location-snippet" aria-label="Referenced text">
-                    &ldquo;{question.textSpan.text}&rdquo;
-                  </p>
-                </section>
-              </li>
-            {/each}
-          {:else}
-            <li class="question-empty">No questions match the selected filters.</li>
-          {/if}
-        </ul>
-      {/if}
-    </div>
->>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a
-  {/each}
-</div>
+  <div class="chip-grid" role="group" aria-label="Question filters">
+    {#if chips.length === 0}
+      <p class="chip-empty">No filters configured.</p>
+    {:else}
+      {#each chips as chip (chip.value)}
+        <button
+          type="button"
+          class="chip"
+          aria-label={chip.ariaLabel}
+          on:click={(event) => handleChipClick(event, chip.value)}
+        >
+          {chip.text}
+        </button>
+      {/each}
+    {/if}
+  </div>
+</section>
 
 <style>
-  .chip-panel {
+  .question-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background: rgba(12, 18, 36, 0.85);
+    border-radius: 16px;
+    padding: 1.5rem;
+    color: #e6e9ef;
+  }
+
+  .panel-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .panel-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  .panel-description {
+    margin: 0;
+    color: rgba(230, 233, 239, 0.7);
+    font-size: 0.95rem;
+  }
+
+  .chip-grid {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
   }
-  button {
+
+  .chip {
+    border: none;
+    border-radius: 999px;
     padding: 0.5rem 1rem;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-    background: #f5f5f5;
+    background: rgba(124, 156, 255, 0.18);
+    color: inherit;
+    font-weight: 500;
     cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+
+  .chip:hover,
+  .chip:focus-visible {
+    background: rgba(124, 156, 255, 0.35);
+    outline: none;
+  }
+
+  .chip:focus-visible {
+    box-shadow: 0 0 0 3px rgba(124, 156, 255, 0.5);
+  }
+
+  .chip-empty {
+    margin: 0;
+    color: rgba(230, 233, 239, 0.6);
   }
 </style>
