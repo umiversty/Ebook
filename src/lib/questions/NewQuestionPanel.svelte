@@ -1,148 +1,131 @@
 <script lang="ts">
-  // A single question card panel
+  export type QuestionLocation = {
+    section: string;
+    page: number | string;
+    offsets: [number, number];
+    snippet: string;
+  };
 
-  export let q: {
+  export type GeneratedQuestion = {
     id: string;
     stem: string;
     hint?: string;
     answer?: string;
-    location?: {
-      section?: string;
-      page?: number;
-      offsets?: [number, number];
-      snippet?: string;
-    };
+    location: QuestionLocation;
   };
 
-  // Whether this panel’s accordion is expanded
-  export let expanded: boolean = false;
 
-  // Callback provided by parent to toggle accordion state
-  export let toggleHint: (id: string) => void = () => {};
-
-  let answerExpanded = false;
-
-  const toggleAnswer = () => {
-    answerExpanded = !answerExpanded;
-  };
-
-  const handleToggleKeydown = (event: KeyboardEvent, toggle: () => void) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      toggle();
-    }
-  };
 </script>
 
-<article class="question-card" aria-labelledby={`question-${q.id}-stem`}>
+<article class="question" aria-labelledby={`${q.id}-stem`}>
   <header class="question-header">
-    <h2 class="question-stem" id={`question-${q.id}-stem`}>
-      {q.stem}
-    </h2>
+    <h3 id={`${q.id}-stem`} class="question-stem">{q.stem}</h3>
+    <button
+      type="button"
+      class="hint-toggle"
+      id={hintButtonId}
+      aria-controls={hintPanelId}
+      aria-expanded={expanded ? 'true' : 'false'}
+      on:click={announceToggle}
+      on:keydown={handleToggleKeydown}
+    >
+      {expanded ? 'Hide hint' : 'Show hint'}
+    </button>
   </header>
 
-  {#if q.hint?.trim()}
-    <section class="hint-section">
-      <h3 class="hint-heading" id={`question-${q.id}-hint-heading`}>
-        <button
-          type="button"
-          class="hint-toggle"
-          aria-controls={`hint-${q.id}`}
-          aria-expanded={expanded}
-          on:click={() => toggleHint(q.id)}
-          on:keydown={(event) =>
-            handleToggleKeydown(event, () => toggleHint(q.id))}
-        >
-          {expanded ? 'Hide hint' : 'Show hint'}
-        </button>
-      </h3>
 
-      {#if expanded}
-        <div
-          id={`hint-${q.id}`}
-          role="region"
-          aria-labelledby={`question-${q.id}-hint-heading`}
-          class="hint-panel"
-        >
-          <p>{q.hint}</p>
-        </div>
-      {/if}
-    </section>
-  {/if}
-
-  {#if q.answer?.trim()}
-    <section class="answer-section">
-      <h3 class="answer-heading" id={`question-${q.id}-answer-heading`}>
-        <button
-          type="button"
-          class="answer-toggle"
-          aria-controls={`answer-${q.id}`}
-          aria-expanded={answerExpanded}
-          on:click={toggleAnswer}
-          on:keydown={(event) => handleToggleKeydown(event, toggleAnswer)}
-        >
-          {answerExpanded ? 'Hide answer' : 'Show answer'}
-        </button>
-      </h3>
-
-      {#if answerExpanded}
-        <div
-          id={`answer-${q.id}`}
-          role="region"
-          aria-labelledby={`question-${q.id}-answer-heading`}
-          class="answer-panel"
-        >
-          <p>{q.answer}</p>
-        </div>
-      {/if}
-    </section>
-  {/if}
-
-  {#if q.location}
-    <section class="location-section" aria-labelledby={`question-${q.id}-location-heading`}>
-      <h3 class="location-heading" id={`question-${q.id}-location-heading`}>
-        Source location
-      </h3>
-      <dl class="location-list">
-          {#if q.location.section}
-            <div class="location-row">
-              <dt class="location-term">Section</dt>
-              <dd><span class="location-section-title">{q.location.section}</span></dd>
-            </div>
-          {/if}
-          {#if q.location.page}
-            <div class="location-row">
-              <dt class="location-term">Page</dt>
-              <dd>{q.location.page}</dd>
-            </div>
-          {/if}
-          {#if q.location.offsets}
-            <div class="location-row">
-              <dt class="location-term">Offsets</dt>
-              <dd>{q.location.offsets[0]} – {q.location.offsets[1]}</dd>
-            </div>
-        {/if}
-      </dl>
-
-      {#if q.location.snippet}
-        <p class="location-snippet" aria-label="Referenced text">
-          “{q.location.snippet}”
-        </p>
-      {/if}
-    </section>
-  {/if}
 </article>
 
 <style>
-  .question-card { background:#0f1428; padding:16px; border-radius:12px; margin-bottom:12px; }
-  .question-stem { font-size:1.1rem; font-weight:600; }
-  .hint-toggle, .answer-toggle {
-    background:none; border:none; color:#7c9cff;
-    cursor:pointer; font-weight:600;
+  .question {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-radius: 16px;
+    background: rgba(12, 18, 36, 0.75);
+    color: #f5f7ff;
   }
-  .hint-heading, .location-heading { font-size:1rem; margin-top:12px; }
-  .location-list { margin:0; padding:0; }
-  .location-row { display:flex; gap:8px; }
-  .location-term { font-weight:600; }
-  .location-snippet { font-style:italic; margin-top:6px; }
+
+  .question-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .question-stem {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+
+  .hint-toggle {
+    border: none;
+    border-radius: 999px;
+    padding: 0.5rem 1rem;
+    background: rgba(124, 156, 255, 0.25);
+    color: inherit;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .hint-toggle:focus-visible {
+    outline: 3px solid rgba(124, 156, 255, 0.6);
+    outline-offset: 2px;
+  }
+
+  .hint[hidden] {
+    display: none;
+  }
+
+  .hint {
+    margin: 0;
+    padding: 1rem;
+    border-radius: 12px;
+    background: rgba(124, 156, 255, 0.12);
+  }
+
+  .location {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .location-heading {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .location-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.5rem;
+    margin: 0;
+  }
+
+  .location-details div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  dt {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(245, 247, 255, 0.6);
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 500;
+  }
+
+  .location-snippet {
+    margin: 0;
+    font-style: italic;
+    color: rgba(245, 247, 255, 0.85);
+  }
 </style>
