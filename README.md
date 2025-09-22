@@ -106,3 +106,9 @@ The `NewQuestionPanel` component renders AI-generated questions as accessible ca
 
 <NewQuestionPanel {questions} />
 ```
+
+## Math & STEM rendering
+
+- EPUB flows prefer inline MathML so equations remain keyboard navigable and selectable in the reader. `enhanceMathForScreenReaders` adds focus management and annotations sourced from the original LaTeX when available.
+- The PDF ➜ HTML overlay pipeline converts LaTeX to MathML on the server (see `mathml_conversion.py`) and preserves TeX annotations so screen readers can read or review the source.
+- Refer to the [MDN MathML compatibility data](https://developer.mozilla.org/en-US/docs/Web/MathML) for current native support trends across engines when planning deployments.

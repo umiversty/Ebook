@@ -35,12 +35,14 @@ describe('EPUB accessibility integrations', () => {
     adapter.mount();
 
     let headingMessage = messages.find((msg) => msg.type === 'heading');
-    expect(headingMessage && (headingMessage.heading as any)?.text).toContain('Colonial Rationing');
+    expect(headingMessage && (headingMessage.heading as any)?.title).toContain('Colonial Rationing');
+    expect((headingMessage?.heading as any)?.location?.source).toBe('epub');
 
     messages.length = 0;
     adapter.goToPage('page-2');
     headingMessage = messages.find((msg) => msg.type === 'heading');
-    expect(headingMessage && (headingMessage.heading as any)?.text).toContain('Implementation');
+    expect(headingMessage && (headingMessage.heading as any)?.title).toContain('Implementation');
+    expect((headingMessage?.heading as any)?.location?.pageId).toBe('page-2');
 
     adapter.destroy();
     container.remove();
