@@ -11,10 +11,38 @@
     stem: string;
     hint?: string;
     answer?: string;
+    whyThisMatters?: string;
     location: QuestionLocation;
   };
 
+  export let q: GeneratedQuestion;
+  export let expanded = false;
+  export let toggleHint: (questionId: string) => void;
 
+  let hintButtonId: string;
+  let hintPanelId: string;
+
+  $: hintButtonId = `${q.id}-hint-toggle`;
+  $: hintPanelId = `${q.id}-hint-panel`;
+
+  function setAriaExpanded(target: EventTarget | null, value: boolean) {
+    if (target instanceof HTMLElement) {
+      target.setAttribute('aria-expanded', value ? 'true' : 'false');
+    }
+  }
+
+  function announceToggle(event: MouseEvent | KeyboardEvent) {
+    const nextExpanded = !expanded;
+    setAriaExpanded(event.currentTarget, nextExpanded);
+    toggleHint(q.id);
+  }
+
+  function handleToggleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      announceToggle(event);
+    }
+  }
 </script>
 
 <article class="question" aria-labelledby={`${q.id}-stem`}>
@@ -33,7 +61,42 @@
     </button>
   </header>
 
+  {#if q.hint}
+    <section
+      id={hintPanelId}
+      class="hint"
+      aria-labelledby={hintButtonId}
+      aria-hidden={expanded ? 'false' : 'true'}
+      hidden={!expanded}
+    >
+      <p>{q.hint}</p>
+      {#if q.answer}
+        <p class="answer"><strong>Answer:</strong> {q.answer}</p>
+      {/if}
+      {#if q.whyThisMatters}
+        <p class="supporting">{q.whyThisMatters}</p>
+      {/if}
+    </section>
+  {/if}
 
+  <section class="location" aria-labelledby={`${q.id}-location-heading`}>
+    <h4 id={`${q.id}-location-heading`} class="location-heading">Source location</h4>
+    <dl class="location-details">
+      <div>
+        <dt>Section</dt>
+        <dd>{q.location.section}</dd>
+      </div>
+      <div>
+        <dt>Page</dt>
+        <dd>{q.location.page}</dd>
+      </div>
+      <div>
+        <dt>Offsets</dt>
+        <dd>{q.location.offsets[0]}–{q.location.offsets[1]}</dd>
+      </div>
+    </dl>
+    <p class="location-snippet">{q.location.snippet}</p>
+  </section>
 </article>
 
 <style>
