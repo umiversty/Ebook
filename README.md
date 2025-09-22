@@ -76,7 +76,7 @@ npm publish
 
 ## NewQuestionPanel
 
-The `NewQuestionPanel` component renders AI-generated questions as accessible cards with interactive hint and answer reveals. Provide an array of questions where each entry includes an `id`, `stem`, `hint`, `answer`, and `whyThisMatters` message:
+The `NewQuestionPanel` component renders AI-generated questions as accessible cards with interactive hint and answer reveals. Provide an array of questions where each entry includes an `id`, `stem`, `hint`, `answer`, `whyThisMatters`, and the corresponding `readingSection`/`textSpan` metadata so teachers can confirm the source location:
 
 ```svelte
 <script lang="ts">
@@ -88,10 +88,27 @@ The `NewQuestionPanel` component renders AI-generated questions as accessible ca
       stem: 'Why did the council choose rationing?',
       hint: 'Consider the pressures on merchants and officials.',
       answer: 'Rationing balanced equity and stability.',
-      whyThisMatters: 'Shows how policy makers reconcile fairness with economics.'
+      whyThisMatters: 'Shows how policy makers reconcile fairness with economics.',
+      readingSection: {
+        id: 'section-implementation',
+        title: 'Implementation',
+        chapterTitle: 'Implementation',
+        pageLabel: '2'
+      },
+      textSpan: {
+        startOffset: 12,
+        endOffset: 168,
+        text: 'Bakers received flour allocations tied to reported demand, and coupons were issued in strict weekly increments.'
+      }
     }
   ];
 </script>
 
 <NewQuestionPanel {questions} />
 ```
+
+## Math & STEM rendering
+
+- EPUB flows prefer inline MathML so equations remain keyboard navigable and selectable in the reader. `enhanceMathForScreenReaders` adds focus management and annotations sourced from the original LaTeX when available.
+- The PDF ➜ HTML overlay pipeline converts LaTeX to MathML on the server (see `mathml_conversion.py`) and preserves TeX annotations so screen readers can read or review the source.
+- Refer to the [MDN MathML compatibility data](https://developer.mozilla.org/en-US/docs/Web/MathML) for current native support trends across engines when planning deployments.

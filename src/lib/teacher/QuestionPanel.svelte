@@ -173,6 +173,36 @@
                     <span class="meta-label">Guide: {question.responseGuide}</span>
                   {/if}
                 </div>
+                <section
+                  class="question-location"
+                  aria-labelledby={`${question.id}-location-heading`}
+                >
+                  <h4 id={`${question.id}-location-heading`} class="location-heading">
+                    Source location
+                  </h4>
+                  <dl class="location-list">
+                    <div class="location-row">
+                      <dt class="location-term">Section</dt>
+                      <dd class="location-definition">
+                        <span class="location-section">{question.readingSection.title}</span>
+                        <span class="location-chapter">{question.readingSection.chapterTitle}</span>
+                      </dd>
+                    </div>
+                    <div class="location-row">
+                      <dt class="location-term">Page</dt>
+                      <dd class="location-definition">{question.readingSection.pageLabel}</dd>
+                    </div>
+                    <div class="location-row">
+                      <dt class="location-term">Offsets</dt>
+                      <dd class="location-definition">
+                        {question.textSpan.startOffset}&ndash;{question.textSpan.endOffset}
+                      </dd>
+                    </div>
+                  </dl>
+                  <p class="location-snippet" aria-label="Referenced text">
+                    &ldquo;{question.textSpan.text}&rdquo;
+                  </p>
+                </section>
               </li>
             {/each}
           {:else}
@@ -345,6 +375,62 @@
     background: rgba(255, 255, 255, 0.06);
     border-radius: 999px;
     padding: 4px 10px;
+  }
+
+  .question-location {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 12px;
+    display: grid;
+    gap: 8px;
+  }
+
+  .location-heading {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #f8fafc;
+  }
+
+  .location-list {
+    margin: 0;
+    display: grid;
+    gap: 6px;
+  }
+
+  .location-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+    align-items: baseline;
+    color: #c0c7d2;
+    font-size: 0.8rem;
+  }
+
+  .location-term {
+    font-weight: 600;
+  }
+
+  .location-definition {
+    margin: 0;
+  }
+
+  .location-section {
+    display: block;
+    color: #ffffff;
+  }
+
+  .location-chapter {
+    display: block;
+    color: #9aa3b2;
+    font-size: 0.75rem;
+  }
+
+  .location-snippet {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #e6e9ef;
   }
 
   .question-empty {
