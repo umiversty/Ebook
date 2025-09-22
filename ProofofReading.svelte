@@ -1,5 +1,6 @@
 <script lang="ts">
   import { afterUpdate, onDestroy, onMount, tick } from 'svelte';
+  import type { Action } from 'svelte/action';
 
   import EpubReader from './src/lib/epub/EpubReader.svelte';
   import { sampleLandmarks, samplePages, sampleToc } from './src/lib/epub/sampleData.js';
@@ -33,6 +34,23 @@
   let isDragging = false;
   let dragFrame: number | null = null;
   let title = 'Colonial Rationing Case Study';
+  let actionCount = 0;
+  let focusableAcknowledged = false;
+  const PANEL_CONTENT_ID = 'teacher-panel-content';
+  const MENU_LIST_ID = 'teacher-menu-list';
+  let panelOpen = true;
+  let menuOpen = false;
+  let menuActiveIndex = 0;
+  let lastMenuSelection: string | null = null;
+  let menuButtonEl: HTMLButtonElement | null = null;
+  let menuListEl: HTMLUListElement | null = null;
+  type QuickMenuItem = { id: string; label: string };
+  const quickMenuItems: QuickMenuItem[] = [
+    { id: 'create-assignment', label: 'Create assignment draft' },
+    { id: 'download-evidence', label: 'Download evidence CSV' },
+    { id: 'share-progress', label: 'Share progress summary' }
+  ];
+  const quickMenuButtons: Array<HTMLButtonElement | null> = [];
 
   let tasks: Task[] = [
     { id: 't1', type: 'highlight', prompt: 'Highlight the sentence where the author explains why rationing was necessary.' },
@@ -171,6 +189,132 @@
   let skimThresh = { minDwellMs: 8000, minInteractions: 1, graceRatio: 0.3 };
 
   // ---------------- Functions ----------------
+  function doSomething() {
+    actionCount += 1;
+  }
+
+  function acknowledgeFocusableContent() {
+    focusableAcknowledged = !focusableAcknowledged;
+  }
+
+  function togglePanel() {
+    panelOpen = !panelOpen;
+  }
+
+  function registerQuickMenuButton(node: HTMLButtonElement | null, index: number) {
+    quickMenuButtons[index] = node;
+  }
+
+  const menuItem: Action<HTMLButtonElement, number> = (node, index) => {
+    registerQuickMenuButton(node, index);
+    return {
+      update(newIndex) {
+        registerQuickMenuButton(null, index);
+        registerQuickMenuButton(node, newIndex);
+      },
+      destroy() {
+        registerQuickMenuButton(null, index);
+      }
+    };
+  };
+
+  function focusMenuItem(index: number) {
+    if (quickMenuItems.length === 0) return;
+    menuActiveIndex = index;
+    const target = quickMenuButtons[menuActiveIndex];
+    target?.focus();
+  }
+
+  async function openMenu(focusIndex = 0) {
+    if (quickMenuItems.length === 0) {
+      menuOpen = true;
+      return;
+    }
+    menuOpen = true;
+    menuActiveIndex = focusIndex;
+    await tick();
+    focusMenuItem(menuActiveIndex);
+  }
+
+  function closeMenu({ focusTrigger = true }: { focusTrigger?: boolean } = {}) {
+    if (!menuOpen) return;
+    menuOpen = false;
+    if (focusTrigger) {
+      menuButtonEl?.focus();
+    }
+  }
+
+  function toggleMenu() {
+    if (menuOpen) {
+      closeMenu();
+    } else {
+      void openMenu(0);
+    }
+  }
+
+  function onMenuButtonKeydown(event: KeyboardEvent) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      void openMenu(0);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      void openMenu(quickMenuItems.length ? quickMenuItems.length - 1 : 0);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      closeMenu();
+    }
+  }
+
+  function onMenuItemKeydown(event: KeyboardEvent, index: number) {
+    if (!menuOpen || quickMenuItems.length === 0) return;
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        focusMenuItem((index + 1) % quickMenuItems.length);
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        focusMenuItem(index - 1 < 0 ? quickMenuItems.length - 1 : index - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        focusMenuItem(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        focusMenuItem(quickMenuItems.length - 1);
+        break;
+      case 'Escape':
+        event.preventDefault();
+        closeMenu();
+        break;
+      case 'Tab':
+        closeMenu({ focusTrigger: false });
+        break;
+      default:
+        break;
+    }
+  }
+
+  function onMenuItemClick(item: QuickMenuItem) {
+    lastMenuSelection = item.label;
+    closeMenu();
+  }
+
+  function handleMenuFocusOut(event: FocusEvent) {
+    if (!menuOpen) return;
+    const next = event.relatedTarget as Node | null;
+    if (!next) {
+      closeMenu({ focusTrigger: false });
+      return;
+    }
+    const isInsideMenu = menuListEl?.contains(next) ?? false;
+    const isTrigger = menuButtonEl?.contains(next) ?? false;
+    if (!isInsideMenu && !isTrigger) {
+      closeMenu({ focusTrigger: false });
+    }
+  }
+
   function percentDone() {
     if (tasks.length === 0) return 0;
     return Math.round((tasks.filter((t) => t.done).length / tasks.length) * 100);
@@ -535,13 +679,81 @@
   }
 
   button.btn,
-  a.btn,
-  .btn[role='button'] {
+  a.btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
   }
   .btn.secondary { background: rgba(255,255,255,.08); color: #e6e9ef; }
+  .quick-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .panel-header {
+    margin-top: 16px;
+    width: 100%;
+    text-align: left;
+    background: rgba(255,255,255,0.08);
+    color: #e6e9ef;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .panel-header:focus-visible,
+  .menu-trigger:focus-visible,
+  .menu-item:focus-visible {
+    outline: 2px solid #7c9cff;
+    outline-offset: 2px;
+  }
+  .panel-content {
+    margin-top: 12px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 12px;
+    padding: 12px 16px;
+  }
+  .panel-list {
+    padding-left: 20px;
+    margin: 0;
+    display: grid;
+    gap: 8px;
+  }
+  .menu-wrapper {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .menu-trigger {
+    background: rgba(124,156,255,0.18);
+    color: #e6e9ef;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+  }
+  .menu-list {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+    background: #1a213b;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    min-width: 220px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+  .menu-item {
+    background: transparent;
+    border: none;
+    color: #e6e9ef;
+    width: 100%;
+    text-align: left;
+    padding: 10px 16px;
+    cursor: pointer;
+  }
+  .menu-item:hover,
+  .menu-item:focus {
+    background: rgba(124,156,255,0.18);
+  }
   .pill { display:inline-block; padding: 2px 8px; border-radius:999px; background: rgba(255,255,255,.06); font-size:12px; }
   .table { width:100%; border-collapse: collapse; }
   .table th, .table td { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 8px; text-align: left; }
@@ -739,6 +951,96 @@
     {/if}
 
     {#if screen==='teacher'}
+    <section class="card" aria-labelledby="teacher-quick-actions-heading" style="margin-bottom:16px;">
+      <div class="title" id="teacher-quick-actions-heading">Teacher quick actions</div>
+      <p class="muted" style="margin-bottom:12px;">Manage common workflow steps without leaving the dashboard.</p>
+      <div class="quick-actions">
+        <button type="button" class="btn" on:click={doSomething} aria-label="Trigger assignment action">
+          Trigger action
+        </button>
+        <button
+          type="button"
+          class="btn secondary"
+          aria-label={focusableAcknowledged ? 'Mark focus review as pending' : 'Mark focus review as complete'}
+          on:click={acknowledgeFocusableContent}
+        >
+          {focusableAcknowledged ? 'Focus review complete' : 'Focusable content'}
+        </button>
+      </div>
+      <p class="muted" style="margin-top:12px;">
+        Action triggered {actionCount} {actionCount === 1 ? 'time' : 'times'}
+        {#if focusableAcknowledged}
+          • Focus review acknowledged
+        {/if}
+      </p>
+
+      <button
+        type="button"
+        class="panel-header"
+        on:click={togglePanel}
+        aria-expanded={panelOpen}
+        aria-controls={PANEL_CONTENT_ID}
+      >
+        {panelOpen ? 'Hide' : 'Show'} assignment plan
+      </button>
+      <div
+        id={PANEL_CONTENT_ID}
+        class="panel-content"
+        aria-hidden={!panelOpen}
+        hidden={!panelOpen}
+      >
+        <p class="muted" style="margin:12px 0 16px 0;">Outline next steps before publishing to students.</p>
+        <ul class="panel-list">
+          <li>Finalize question set and align to standards.</li>
+          <li>Set due date and class section.</li>
+          <li>Review accessibility notes for accommodations.</li>
+        </ul>
+      </div>
+
+      <div class="menu-wrapper">
+        <button
+          type="button"
+          class="menu-trigger"
+          bind:this={menuButtonEl}
+          on:click={toggleMenu}
+          on:keydown={onMenuButtonKeydown}
+          aria-haspopup="true"
+          aria-expanded={menuOpen}
+          aria-controls={MENU_LIST_ID}
+        >
+          Quick menu
+        </button>
+        <ul
+          id={MENU_LIST_ID}
+          class="menu-list"
+          role="menu"
+          bind:this={menuListEl}
+          aria-hidden={!menuOpen}
+          hidden={!menuOpen}
+          on:focusout={handleMenuFocusOut}
+        >
+          {#each quickMenuItems as item, index (item.id)}
+            <li role="none">
+              <button
+                type="button"
+                class="menu-item"
+                role="menuitem"
+                use:menuItem={index}
+                tabindex={menuOpen && menuActiveIndex === index ? 0 : -1}
+                on:keydown={(event) => onMenuItemKeydown(event, index)}
+                on:click={() => onMenuItemClick(item)}
+              >
+                {item.label}
+              </button>
+            </li>
+          {/each}
+        </ul>
+        {#if lastMenuSelection}
+          <p class="muted" style="margin-top:12px;">Last selected: {lastMenuSelection}</p>
+        {/if}
+      </div>
+    </section>
+
     <!-- Premium Settings (Skim Alerts) -->
     {#if featureFlags.premium}
       <section class="card" style="margin-bottom:16px;">
