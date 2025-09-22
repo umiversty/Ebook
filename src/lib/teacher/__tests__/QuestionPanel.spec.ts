@@ -1,20 +1,58 @@
-import { render, screen } from "@testing-library/svelte";
-import QuestionPanel from "../QuestionPanel.svelte";
-import { describe, it, expect, vi } from "vitest";
+import '@testing-library/jest-dom/vitest';
+import { fireEvent, render, screen } from '@testing-library/svelte';
+import { describe, expect, it, vi } from 'vitest';
 
-describe("QuestionPanel component", () => {
-  it("renders chip buttons with correct labels", () => {
-    render(QuestionPanel, {
-      props: {
-        chips: [
-          { text: "Multiple Choice", ariaLabel: "multiple choice chip", value: "mc" },
-          { text: "Essay", ariaLabel: "essay chip", value: "essay" },
-        ],
-        onBloomChipClick: vi.fn(),
-      },
+import QuestionPanel from '../QuestionPanel.svelte';
+import {
+  createQuestionPanelStores,
+  updateBloomFilter,
+  updateDifficultyFilter
+} from '../questionPanelState';
+
+describe('QuestionPanel component', () => {
+  it('filters questions by Bloom tier and updates accessibility state', async () => {
+    render(QuestionPanel);
+
+    const analyzeChip = screen.getByRole('button', { name: /Bloom tier: Analyze/i });
+    await fireEvent.click(analyzeChip);
+
+    expect(analyzeChip).toHaveAttribute('aria-pressed', 'true');
+    const questionHeadings = screen.getAllByRole('heading', { level: 3 });
+    expect(questionHeadings).toHaveLength(1);
+    expect(questionHeadings[0]).toHaveTextContent(/Which evidence best shows/i);
+  });
+
+  it('invokes provided chip callbacks with the selected value and element', async () => {
+    const stores = createQuestionPanelStores();
+    const bloomSpy = vi.fn((value, target: HTMLButtonElement | null) => {
+      updateBloomFilter(stores.bloomFilter, value, target);
+    });
+    const difficultySpy = vi.fn((value, target: HTMLButtonElement | null) => {
+      updateDifficultyFilter(stores.difficultyFilter, value, target);
     });
 
-    expect(screen.getByRole("button", { name: /multiple choice/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /essay/i })).toBeInTheDocument();
+    render(QuestionPanel, {
+      props: {
+        stores,
+        onBloomChipClick: bloomSpy,
+        onDifficultyChipClick: difficultySpy
+      }
+    });
+
+    const rememberChip = screen.getByRole('button', { name: /Bloom tier: Remember/i });
+    await fireEvent.click(rememberChip);
+
+    expect(bloomSpy).toHaveBeenCalledTimes(1);
+    expect(bloomSpy).toHaveBeenCalledWith('Remember', rememberChip);
+    expect(rememberChip).toHaveAttribute('aria-pressed', 'true');
+
+    const hardChip = screen.getByRole('button', { name: /Difficulty: Hard/i });
+    await fireEvent.click(hardChip);
+
+    expect(difficultySpy).toHaveBeenCalledTimes(1);
+    expect(difficultySpy).toHaveBeenCalledWith('Hard', hardChip);
+    expect(hardChip).toHaveAttribute('aria-pressed', 'true');
+
+    expect(screen.getByText(/No questions match the selected filters/i)).toBeInTheDocument();
   });
 });
