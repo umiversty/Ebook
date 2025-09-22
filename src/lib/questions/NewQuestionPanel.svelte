@@ -14,24 +14,7 @@
     location: QuestionLocation;
   };
 
-  export let q: GeneratedQuestion;
-  export let expanded = false;
-  export let toggleHint: (id: string) => void = () => {};
 
-  const hintButtonId = `${q.id}-hint-toggle`;
-  const hintPanelId = `${q.id}-hint-panel`;
-
-  function announceToggle(event: Event) {
-    event.preventDefault();
-    toggleHint(q.id);
-  }
-
-  function handleToggleKeydown(event: KeyboardEvent) {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      toggleHint(q.id);
-    }
-  }
 </script>
 
 <article class="question" aria-labelledby={`${q.id}-stem`}>
@@ -50,30 +33,7 @@
     </button>
   </header>
 
-  <section
-    id={hintPanelId}
-    class="hint"
-    role="region"
-    aria-labelledby={hintButtonId}
-    hidden={!expanded}
-  >
-    <p>{q.hint ?? 'No hint available.'}</p>
-  </section>
 
-  <section class="location" aria-label="Source location">
-    <h4 class="location-heading">{q.location.section}</h4>
-    <dl class="location-details">
-      <div>
-        <dt>Page</dt>
-        <dd>Page {q.location.page}</dd>
-      </div>
-      <div>
-        <dt>Offsets</dt>
-        <dd>{q.location.offsets[0]}–{q.location.offsets[1]}</dd>
-      </div>
-    </dl>
-    <p class="location-snippet">{q.location.snippet}</p>
-  </section>
 </article>
 
 <style>
