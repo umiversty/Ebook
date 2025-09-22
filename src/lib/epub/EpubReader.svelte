@@ -4,16 +4,16 @@
   import { createEpubViewAdapter, ADAPTER_MESSAGE_SOURCE } from './viewAdapter.js';
   import { interpretMenuKey } from './tocNavigation.js';
   import type {
-    EpubHeading,
     EpubLandmark,
     EpubPage,
     EpubTocItem,
     EvidenceCapturePayload,
     SearchResult
   } from './types.js';
+  import type { ReadingSection } from '../reader/readingSection.js';
 
   type MessageEventData =
-    | { source: string; type: 'heading'; heading: EpubHeading | null; pageId: string | null }
+    | { source: string; type: 'heading'; heading: ReadingSection | null; pageId: string | null }
     | { source: string; type: 'pagechange'; pageId: string; label?: string }
     | ({ source: string; type: 'evidence' } & EvidenceCapturePayload);
 
@@ -24,7 +24,7 @@
 
   const dispatch = createEventDispatcher<{
     pagechange: { pageId: string };
-    heading: { heading: EpubHeading | null };
+    heading: { heading: ReadingSection | null };
     evidencecapture: { payload: EvidenceCapturePayload };
   }>();
 
@@ -33,7 +33,7 @@
   let searchInput: HTMLInputElement | null = null;
   let adapter: ReturnType<typeof createEpubViewAdapter> | null = null;
   let currentPage: EpubPage | null = null;
-  let currentHeading: EpubHeading | null = null;
+  let currentHeading: ReadingSection | null = null;
   let headingAnnouncement = '';
   let pageAnnouncement = '';
   let tocOpen = false;
@@ -165,7 +165,7 @@
     if (!data || typeof data !== 'object') return;
     if (data.source !== ADAPTER_MESSAGE_SOURCE) return;
     if (data.type === 'heading') {
-      headingAnnouncement = data.heading?.text ?? '';
+      headingAnnouncement = data.heading?.title ?? '';
       currentHeading = data.heading ?? null;
       dispatch('heading', { heading: currentHeading });
     }
@@ -191,9 +191,9 @@
     const unsubPage = adapter.currentPage.subscribe((page: EpubPage | null) => {
       currentPage = page;
     });
-    const unsubHeading = adapter.currentHeading.subscribe((heading: EpubHeading | null) => {
+    const unsubHeading = adapter.currentHeading.subscribe((heading: ReadingSection | null) => {
       currentHeading = heading;
-      headingAnnouncement = heading?.text ?? '';
+      headingAnnouncement = heading?.title ?? '';
     });
     adapter.mount();
     window.addEventListener('message', handleMessage);

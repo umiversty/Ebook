@@ -1,5 +1,3 @@
-<svelte:options runes={false} />
-
 <script lang="ts">
   export interface GeneratedQuestion {
     id: string;

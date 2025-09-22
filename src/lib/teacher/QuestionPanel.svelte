@@ -71,6 +71,14 @@
   function onDifficultyChipClick(value: DifficultyChipValue, target: HTMLButtonElement | null) {
     updateDifficultyFilter(difficultyFilter, value, target);
   }
+
+  function handleBloomChipEvent(value: BloomChipValue, event: Event) {
+    onBloomChipClick(value, event.currentTarget as HTMLButtonElement | null);
+  }
+
+  function handleDifficultyChipEvent(value: DifficultyChipValue, event: Event) {
+    onDifficultyChipClick(value, event.currentTarget as HTMLButtonElement | null);
+  }
 </script>
 
 <section class="question-panel">
@@ -124,8 +132,7 @@
                   class:active={$bloomFilter === chip.value}
                   aria-pressed={$bloomFilter === chip.value}
                   aria-label={chip.ariaLabel}
-                  on:click={(event) =>
-                    onBloomChipClick(chip.value, event.currentTarget as HTMLButtonElement)}
+                  on:click={(event) => handleBloomChipEvent(chip.value, event)}
                 >
                   {chip.text}
                 </button>
@@ -142,8 +149,7 @@
                   class:active={$difficultyFilter === chip.value}
                   aria-pressed={$difficultyFilter === chip.value}
                   aria-label={chip.ariaLabel}
-                  on:click={(event) =>
-                    onDifficultyChipClick(chip.value, event.currentTarget as HTMLButtonElement)}
+                  on:click={(event) => handleDifficultyChipEvent(chip.value, event)}
                 >
                   {chip.text}
                 </button>
