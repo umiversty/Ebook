@@ -3,6 +3,7 @@
   import type { Action } from 'svelte/action';
   import { createEpubViewAdapter, ADAPTER_MESSAGE_SOURCE } from './viewAdapter.js';
   import { interpretMenuKey } from './tocNavigation.js';
+  import { enhanceMathForScreenReaders } from './mathml.js';
   import type {
     EpubHeading,
     EpubLandmark,
@@ -190,6 +191,11 @@
     });
     const unsubPage = adapter.currentPage.subscribe((page: EpubPage | null) => {
       currentPage = page;
+      void tick().then(() => {
+        if (container) {
+          enhanceMathForScreenReaders(container);
+        }
+      });
     });
     const unsubHeading = adapter.currentHeading.subscribe((heading: EpubHeading | null) => {
       currentHeading = heading;
