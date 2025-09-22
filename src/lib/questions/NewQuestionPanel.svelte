@@ -17,8 +17,25 @@
   // Whether this panel’s accordion is expanded
   export let expanded: boolean = false;
 
+<<<<<<< HEAD
   // Callback provided by parent to toggle accordion state
   export let toggleHint: (id: string) => void = () => {};
+=======
+  const toggleAnswer = (id: string) => {
+    openAnswers = toggleSet(openAnswers, id);
+  };
+
+  const handleToggleKeydown = (
+    event: KeyboardEvent,
+    id: string,
+    toggle: (itemId: string) => void
+  ) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggle(id);
+    }
+  };
+>>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a
 </script>
 
 <article class="question-card" aria-labelledby={`question-${q.id}-stem`}>
@@ -28,15 +45,55 @@
     </h2>
   </header>
 
+<<<<<<< HEAD
   {#if q.hint}
     <section class="hint-section">
       <h3 class="hint-heading" id={`question-${q.id}-hint-heading`}>
+=======
+      {#if question.hint?.trim()}
+        <section class="hint-section">
+          <h3 id={`${question.id}-hint-heading`} class="hint-heading">
+            <button
+              type="button"
+              class="hint-toggle"
+              aria-expanded={openHints.has(question.id)}
+              aria-controls={`${question.id}-hint-panel`}
+              on:click={() => toggleHint(question.id)}
+              on:keydown={(event) => handleToggleKeydown(event, question.id, toggleHint)}
+            >
+              {openHints.has(question.id) ? 'Hide hint' : 'Show hint'}
+            </button>
+          </h3>
+
+          {#if openHints.has(question.id)}
+            <div
+              id={`${question.id}-hint-panel`}
+              role="region"
+              aria-labelledby={`${question.id}-hint-heading`}
+              class="hint-panel"
+            >
+              <p>{question.hint}</p>
+            </div>
+          {/if}
+        </section>
+      {/if}
+
+      <section class="answer-section">
+>>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a
         <button
           type="button"
+<<<<<<< HEAD
           class="hint-toggle"
           aria-controls={`hint-${q.id}`}
           aria-expanded={expanded}
           on:click={() => toggleHint(q.id)}
+=======
+          class="answer-toggle"
+          aria-expanded={openAnswers.has(question.id)}
+          aria-controls={`${question.id}-answer-panel`}
+          on:click={() => toggleAnswer(question.id)}
+          on:keydown={(event) => handleToggleKeydown(event, question.id, toggleAnswer)}
+>>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a
         >
           {expanded ? 'Hide hint' : 'Show hint'}
         </button>

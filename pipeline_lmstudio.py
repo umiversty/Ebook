@@ -8,7 +8,14 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+from mathml_conversion import (
+    LatexMathMLConverter,
+    convert_latex_segments_to_mathml,
+    convert_pdf_pages_to_html_overlays,
+    pdf_page_to_html_overlay,
+)
 
 try:  # pragma: no cover - optional dependency
     from lmstudio import Client  # type: ignore
@@ -129,6 +136,33 @@ def extract_pdf_text(pdf_path: str) -> List[PDFPage]:
         raw_text = page.extract_text() or ""
         pages.append(PDFPage(index=idx + 1, text=clean_text(raw_text)))
     return pages
+
+
+def convert_page_text_to_mathml_html(
+    page: PDFPage, converter: Optional[LatexMathMLConverter] = None
+) -> str:
+    """Convert a PDF page's text to an accessible HTML overlay."""
+
+    converter = converter or LatexMathMLConverter()
+    return pdf_page_to_html_overlay(page, converter)
+
+
+def convert_document_to_mathml_overlays(
+    pages: Sequence[PDFPage], converter: Optional[LatexMathMLConverter] = None
+) -> List[str]:
+    """Convert pages to MathML-first HTML overlays for the web reader."""
+
+    converter = converter or LatexMathMLConverter()
+    return convert_pdf_pages_to_html_overlays(pages, converter)
+
+
+def convert_text_block_to_mathml(
+    text: str, converter: Optional[LatexMathMLConverter] = None
+) -> str:
+    """Convert inline LaTeX in ``text`` to MathML for HTML overlays."""
+
+    converter = converter or LatexMathMLConverter()
+    return convert_latex_segments_to_mathml(text, converter)
 
 
 # --------------------------

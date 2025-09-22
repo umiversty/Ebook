@@ -7,6 +7,7 @@ import type {
   EvidenceCapturePayload,
   SearchResult
 } from './types.js';
+import { createSectionFromEpubHeading, type ReadingSection } from '../reader/readingSection.js';
 
 export const ADAPTER_MESSAGE_SOURCE = 'epub-adapter';
 
@@ -17,13 +18,13 @@ export interface AdapterConfig {
   landmarks: EpubLandmark[];
   initialPageId?: string;
   onPageChange?: (pageId: string) => void;
-  onHeadingChange?: (heading: EpubHeading | null) => void;
+  onHeadingChange?: (section: ReadingSection | null) => void;
   onEvidenceCapture?: (payload: EvidenceCapturePayload) => void;
 }
 
 export interface EpubViewAdapter {
   currentPage: Readable<EpubPage | null>;
-  currentHeading: Readable<EpubHeading | null>;
+  currentHeading: Readable<ReadingSection | null>;
   mount(): void;
   destroy(): void;
   goToPage(pageId: string): void;
@@ -48,7 +49,7 @@ function stripHtml(html: string): string {
 export function createEpubViewAdapter(config: AdapterConfig): EpubViewAdapter {
   const { container, pages, initialPageId, onPageChange, onHeadingChange, onEvidenceCapture } = config;
   const currentPage = writable<EpubPage | null>(null);
-  const currentHeading = writable<EpubHeading | null>(null);
+  const currentHeading = writable<ReadingSection | null>(null);
 
   let mounted = false;
 
@@ -57,10 +58,22 @@ export function createEpubViewAdapter(config: AdapterConfig): EpubViewAdapter {
     pageIndex.set(page.id, page);
   }
 
+  function toReadingSection(heading: EpubHeading | null, pageId: string | null): ReadingSection | null {
+    if (!heading) return null;
+    const safePageId = pageId ?? heading.id;
+    const page = pageIndex.get(safePageId);
+    return createSectionFromEpubHeading({
+      heading,
+      pageId: safePageId,
+      pageLabel: page?.label
+    });
+  }
+
   function setHeading(heading: EpubHeading | null, pageId: string | null) {
-    currentHeading.set(heading);
-    onHeadingChange?.(heading ?? null);
-    emitMessage('heading', { heading, pageId });
+    const section = heading ? toReadingSection(heading, pageId) : null;
+    currentHeading.set(section);
+    onHeadingChange?.(section);
+    emitMessage('heading', { heading: section, pageId });
   }
 
   function setPage(page: EpubPage | null) {
