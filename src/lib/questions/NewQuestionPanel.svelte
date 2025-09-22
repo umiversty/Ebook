@@ -33,6 +33,17 @@
   const toggleAnswer = (id: string) => {
     openAnswers = toggleSet(openAnswers, id);
   };
+
+  const handleToggleKeydown = (
+    event: KeyboardEvent,
+    id: string,
+    toggle: (itemId: string) => void
+  ) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggle(id);
+    }
+  };
 </script>
 
 <section class="new-question-panel">
@@ -51,6 +62,7 @@
               aria-expanded={openHints.has(question.id)}
               aria-controls={`${question.id}-hint-panel`}
               on:click={() => toggleHint(question.id)}
+              on:keydown={(event) => handleToggleKeydown(event, question.id, toggleHint)}
             >
               {openHints.has(question.id) ? 'Hide hint' : 'Show hint'}
             </button>
@@ -77,6 +89,7 @@
           aria-expanded={openAnswers.has(question.id)}
           aria-controls={`${question.id}-answer-panel`}
           on:click={() => toggleAnswer(question.id)}
+          on:keydown={(event) => handleToggleKeydown(event, question.id, toggleAnswer)}
         >
           {openAnswers.has(question.id) ? 'Hide answer' : 'Show answer'}
         </button>
