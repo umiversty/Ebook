@@ -1,10 +1,12 @@
 <script lang="ts">
   import EpubReader from './src/lib/epub/EpubReader.svelte';
   import { sampleLandmarks, samplePages, sampleToc } from './src/lib/epub/sampleData.js';
-  import type { EpubHeading, EvidenceCapturePayload } from './src/lib/epub/types.js';
+  import type { EvidenceCapturePayload } from './src/lib/epub/types.js';
   import { applyKeyboardResize, clampColumnPx, fractionToPx, MIN_COLUMN_PX, pxToFraction } from './splitLayout';
-  import { onMount, tick } from 'svelte';
+
   import QuestionPanel from './src/lib/teacher/QuestionPanel.svelte';
+  import { createSectionFromEpubHeading, type ReadingSection } from './src/lib/reader/readingSection.js';
+  import { setViewportWidth as updateViewportStore, viewportWidthStore } from './src/lib/reader/viewportStore.js';
 
 
   // ---------------- Types ----------------
@@ -38,10 +40,20 @@
   ];
 
   let evidence: Evidence[] = [];
-  let currentHeading: EpubHeading | null = samplePages[0]?.headings[0] ?? null;
+  const initialSection = samplePages[0]?.headings[0]
+    ? createSectionFromEpubHeading({
+        heading: samplePages[0].headings[0],
+        pageId: samplePages[0].id,
+        pageLabel: samplePages[0].label
+      })
+    : null;
+  let currentSection: ReadingSection | null = initialSection;
   let currentPageId: string | null = samplePages[0]?.id ?? null;
   let dwellMs = 0;
-  let viewportWidth = typeof window !== 'undefined' ? window.innerWidth : BREAKPOINT;
+  let viewportWidth = BREAKPOINT;
+  const unsubscribeViewport = viewportWidthStore.subscribe((value) => {
+    viewportWidth = value;
+  });
 
   type BreadcrumbNode = { id: string; label: string; href: string; isCurrent?: boolean };
   const COURSE_BREADCRUMB: BreadcrumbNode = {
@@ -62,25 +74,42 @@
 
   function syncViewportWidth() {
     if (typeof window === 'undefined') return;
-    viewportWidth = window.innerWidth;
+    const width = window.innerWidth;
+    if (width !== viewportWidth) {
+      updateViewportStore(width);
+    }
   }
 
-  function resolveSectionLabel(heading: EpubHeading | null, chapterTitle: string): string {
-    if (!heading) return 'Section overview';
-    if (heading.text.trim() === chapterTitle.trim()) {
+  function isMobileWidth(width: number): boolean {
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      try {
+        const query = window.matchMedia(`(max-width: ${BREAKPOINT - 1}px)`);
+        if (typeof query.matches === 'boolean') {
+          return query.matches;
+        }
+      } catch {
+        // ignore matchMedia errors in non-browser environments
+      }
+    }
+    return width < BREAKPOINT;
+  }
+
+  function resolveSectionLabel(section: ReadingSection | null, chapterTitle: string): string {
+    if (!section) return 'Section overview';
+    if (section.title.trim() === chapterTitle.trim()) {
       return 'Overview';
     }
-    return heading.text;
+    return section.title;
   }
   let chapterBreadcrumb: BreadcrumbNode = { id: 'chapter', label: title, href: '#chapter' };
   let sectionBreadcrumb: BreadcrumbNode = {
     id: 'section',
-    label: resolveSectionLabel(currentHeading, title),
+    label: resolveSectionLabel(currentSection, title),
     href: '#section',
     isCurrent: true
   };
   let breadcrumbTrail: BreadcrumbNode[] = [COURSE_BREADCRUMB, UNIT_BREADCRUMB, chapterBreadcrumb, sectionBreadcrumb];
-  let isMobileBreadcrumb = viewportWidth < BREAKPOINT;
+  let isMobileBreadcrumb = isMobileWidth(viewportWidth);
   let visibleBreadcrumbTrail: BreadcrumbNode[] = breadcrumbTrail;
   let hiddenBreadcrumbTrail: BreadcrumbNode[] = [];
   let breadcrumbAriaLabel = `Course navigation: ${breadcrumbTrail.map((crumb) => crumb.label).join(BREADCRUMB_SEPARATOR)}`;
@@ -147,6 +176,15 @@
     };
   });
 
+  afterUpdate(() => {
+    if (typeof window === 'undefined') return;
+    syncViewportWidth();
+  });
+
+  onDestroy(() => {
+    unsubscribeViewport();
+  });
+
   function percentDone() {
     if (tasks.length === 0) return 0;
     return Math.round((tasks.filter((t) => t.done).length / tasks.length) * 100);
@@ -162,8 +200,8 @@
     if (ht) ht.done = true;
   }
 
-  function handleHeading(event: CustomEvent<{ heading: EpubHeading | null }>) {
-    currentHeading = event.detail.heading ?? null;
+  function handleHeading(event: CustomEvent<{ heading: ReadingSection | null }>) {
+    currentSection = event.detail.heading ?? null;
   }
 
   function handlePageChange(event: CustomEvent<{ pageId: string }>) {
@@ -175,6 +213,11 @@
     tasks = tasks.map((task) =>
       task.id === id ? { ...task, answer: val, done: trimmed.length > 3 } : task
     );
+  }
+
+  function handleTaskInput(id: string, event: Event) {
+    const target = event.target as HTMLTextAreaElement | null;
+    setAnswer(id, target?.value ?? '');
   }
 
   function cancelDragFrame() {
@@ -300,12 +343,12 @@
   $: chapterBreadcrumb = { id: 'chapter', label: title, href: '#chapter' };
   $: sectionBreadcrumb = {
     id: 'section',
-    label: resolveSectionLabel(currentHeading, title),
+    label: resolveSectionLabel(currentSection, title),
     href: '#section',
     isCurrent: true
   };
   $: breadcrumbTrail = [COURSE_BREADCRUMB, UNIT_BREADCRUMB, chapterBreadcrumb, sectionBreadcrumb];
-  $: isMobileBreadcrumb = viewportWidth < BREAKPOINT;
+  $: isMobileBreadcrumb = isMobileWidth(viewportWidth);
   $: visibleBreadcrumbTrail = isMobileBreadcrumb && breadcrumbTrail.length > 2
     ? breadcrumbTrail.slice(-2)
     : breadcrumbTrail;
@@ -573,7 +616,7 @@
         <div class="muted" style="margin-bottom:12px;">Read naturally; complete tasks as you go. Highlights count as evidence.</div>
 
         <div class="muted" style="margin-bottom:12px;">
-          Current section: {currentHeading?.text ?? '—'}
+          Current section: {currentSection?.title ?? '—'}
           {#if currentPageId}
             <span class="pill" style="margin-left:8px;">Page {currentPageId}</span>
           {/if}
@@ -639,7 +682,12 @@
               <div class="muted" style="font-size:12px;">Select a sentence in the reading to complete.</div>
               {#if t.done}<div class="pill" style="margin-top:6px;background:rgba(61,220,151,.18); color: #3ddc97;">Completed</div>{/if}
             {:else}
-              <textarea class="card" rows="3" placeholder="Type your response…" on:input={(e:any)=> setAnswer(t.id, e.target.value)}>{t.answer || ''}</textarea>
+              <textarea
+                class="card"
+                rows="3"
+                placeholder="Type your response…"
+                on:input={(event) => handleTaskInput(t.id, event)}
+              >{t.answer || ''}</textarea>
             {/if}
           </div>
         {/each}

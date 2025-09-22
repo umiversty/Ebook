@@ -1,5 +1,3 @@
-<svelte:options runes={false} />
-
 <script lang="ts">
   import type { ReadingSection, ReadingTextSpan } from '../reading/types';
 
