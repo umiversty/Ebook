@@ -17,25 +17,21 @@
   // Whether this panel’s accordion is expanded
   export let expanded: boolean = false;
 
-<<<<<<< HEAD
   // Callback provided by parent to toggle accordion state
   export let toggleHint: (id: string) => void = () => {};
-=======
-  const toggleAnswer = (id: string) => {
-    openAnswers = toggleSet(openAnswers, id);
+
+  let answerExpanded = false;
+
+  const toggleAnswer = () => {
+    answerExpanded = !answerExpanded;
   };
 
-  const handleToggleKeydown = (
-    event: KeyboardEvent,
-    id: string,
-    toggle: (itemId: string) => void
-  ) => {
+  const handleToggleKeydown = (event: KeyboardEvent, toggle: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      toggle(id);
+      toggle();
     }
   };
->>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a
 </script>
 
 <article class="question-card" aria-labelledby={`question-${q.id}-stem`}>
@@ -45,83 +41,60 @@
     </h2>
   </header>
 
-<<<<<<< HEAD
-  {#if q.hint}
+  {#if q.hint?.trim()}
     <section class="hint-section">
       <h3 class="hint-heading" id={`question-${q.id}-hint-heading`}>
-=======
-      {#if question.hint?.trim()}
-        <section class="hint-section">
-          <h3 id={`${question.id}-hint-heading`} class="hint-heading">
-            <button
-              type="button"
-              class="hint-toggle"
-              aria-expanded={openHints.has(question.id)}
-              aria-controls={`${question.id}-hint-panel`}
-              on:click={() => toggleHint(question.id)}
-              on:keydown={(event) => handleToggleKeydown(event, question.id, toggleHint)}
-            >
-              {openHints.has(question.id) ? 'Hide hint' : 'Show hint'}
-            </button>
-          </h3>
-
-          {#if openHints.has(question.id)}
-            <div
-              id={`${question.id}-hint-panel`}
-              role="region"
-              aria-labelledby={`${question.id}-hint-heading`}
-              class="hint-panel"
-            >
-              <p>{question.hint}</p>
-            </div>
-          {/if}
-        </section>
-      {/if}
-
-      <section class="answer-section">
->>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a
         <button
           type="button"
-<<<<<<< HEAD
           class="hint-toggle"
           aria-controls={`hint-${q.id}`}
           aria-expanded={expanded}
           on:click={() => toggleHint(q.id)}
-=======
-          class="answer-toggle"
-          aria-expanded={openAnswers.has(question.id)}
-          aria-controls={`${question.id}-answer-panel`}
-          on:click={() => toggleAnswer(question.id)}
-          on:keydown={(event) => handleToggleKeydown(event, question.id, toggleAnswer)}
->>>>>>> 32cc9799d8353706474bd002ae1b2e8bb8e5042a
+          on:keydown={(event) =>
+            handleToggleKeydown(event, () => toggleHint(q.id))}
         >
           {expanded ? 'Hide hint' : 'Show hint'}
         </button>
       </h3>
 
-      <div
-        id={`hint-${q.id}`}
-        hidden={!expanded}
-        aria-labelledby={`question-${q.id}-hint-heading`}
-      >
-        {q.hint}
-      </div>
+      {#if expanded}
+        <div
+          id={`hint-${q.id}`}
+          role="region"
+          aria-labelledby={`question-${q.id}-hint-heading`}
+          class="hint-panel"
+        >
+          <p>{q.hint}</p>
+        </div>
+      {/if}
     </section>
   {/if}
 
-  {#if q.answer}
+  {#if q.answer?.trim()}
     <section class="answer-section">
-      <button
-        type="button"
-        class="answer-toggle"
-        aria-controls={`answer-${q.id}`}
-        aria-expanded="false"
-      >
-        Show answer
-      </button>
-      <div id={`answer-${q.id}`} hidden>
-        {q.answer}
-      </div>
+      <h3 class="answer-heading" id={`question-${q.id}-answer-heading`}>
+        <button
+          type="button"
+          class="answer-toggle"
+          aria-controls={`answer-${q.id}`}
+          aria-expanded={answerExpanded}
+          on:click={toggleAnswer}
+          on:keydown={(event) => handleToggleKeydown(event, toggleAnswer)}
+        >
+          {answerExpanded ? 'Hide answer' : 'Show answer'}
+        </button>
+      </h3>
+
+      {#if answerExpanded}
+        <div
+          id={`answer-${q.id}`}
+          role="region"
+          aria-labelledby={`question-${q.id}-answer-heading`}
+          class="answer-panel"
+        >
+          <p>{q.answer}</p>
+        </div>
+      {/if}
     </section>
   {/if}
 
@@ -131,23 +104,23 @@
         Source location
       </h3>
       <dl class="location-list">
-        {#if q.location.section}
-          <div class="location-row">
-            <dt>Section</dt>
-            <dd><span class="location-section-title">{q.location.section}</span></dd>
-          </div>
-        {/if}
-        {#if q.location.page}
-          <div class="location-row">
-            <dt>Page</dt>
-            <dd>{q.location.page}</dd>
-          </div>
-        {/if}
-        {#if q.location.offsets}
-          <div class="location-row">
-            <dt>Offsets</dt>
-            <dd>{q.location.offsets[0]} – {q.location.offsets[1]}</dd>
-          </div>
+          {#if q.location.section}
+            <div class="location-row">
+              <dt class="location-term">Section</dt>
+              <dd><span class="location-section-title">{q.location.section}</span></dd>
+            </div>
+          {/if}
+          {#if q.location.page}
+            <div class="location-row">
+              <dt class="location-term">Page</dt>
+              <dd>{q.location.page}</dd>
+            </div>
+          {/if}
+          {#if q.location.offsets}
+            <div class="location-row">
+              <dt class="location-term">Offsets</dt>
+              <dd>{q.location.offsets[0]} – {q.location.offsets[1]}</dd>
+            </div>
         {/if}
       </dl>
 
